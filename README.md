@@ -3,7 +3,7 @@
 
 This repository implements an end-to-end data engineering pipeline designed to digitize and validate handwritten Thai election result forms (**ส.ส. 5/18**) from **Uthai Thani, Constituency District 2**. 
 
-The project focuses on transforming complex, handwritten physical records into structured, high-quality digital data using state-of-the-art Vision-Language Models (VLMs).
+The project focuses on transforming complex, handwritten physical records into structured, high-quality digital data using state-of-the-art Vision-Language Models (VLMs), orchestrated via **Apache Airflow**.
 
 ---
 
@@ -30,6 +30,7 @@ Our pipeline is built on the principles of **Resilience** and **Data Quality**:
     * *Constituency (แบ่งเขต):* Optimized for single-page extraction with image splitting.
     * *Party List (บัญชีรายชื่อ):* Processes multi-page documents with high-ratio compression.
 3.  **Data Sanitization:** Automated mapping of Thai numerals (๑-๙) to Arabic (1-9) and removal of OCR noise.
+4.  **Parallel Processing:** Uses Airflow's Dynamic Task Mapping to process multiple election units simultaneously.
 
 ---
 
@@ -47,19 +48,45 @@ To ensure data integrity (Data Quality Assurance), the pipeline implements sever
 
 ---
 
-## 🛠️ Getting Started
+## 🚀 The Final Pipeline (`/election_pipeline`)
+The `/election_pipeline` directory contains the production-ready version of this project. It connects directly to Google Drive to fetch election forms, processes them using Typhoon API, and aggregates the results—all orchestrated automatically by **Docker** and **Apache Airflow**.
 
-1. **Clone the repo:**
+### 🛠️ Getting Started (Airflow Version)
+
+**1. Clone the repository & Navigate:**
    ```bash
    git clone https://github.com/098ff/dsde_final_project.git
+   cd dsde_final_project/election_pipeline
    ```
-2. **Setup Environment:**
-   Create a `.env` file and add your Typhoon API Key:
-   ```env
-   TYPHOON_API_KEY=your_key_here
+
+**2. Setup Credentials:**
+   * Create a `.env` file in the root of the `election_pipeline` folder:
+     ```env
+     TYPHOON_API_KEY=your_typhoon_api_key_here
+     ```
+   * Place your Google Drive OAuth credential file (`client_secret.json` or `token.json`) inside the designated folder (e.g., `src/`).
+
+**3. Configure Target Google Drive Folder:**
+   * Open `src/config.py`.
+   * Update the `GDRIVE_ROOT_FOLDER_ID` to match the exact ID of your target folder on Google Drive (e.g., the folder for "อุทัยธานี_เขต2").
+     ```python
+     GDRIVE_ROOT_FOLDER_ID = 'your_google_drive_folder_id'
+     ```
+
+**4. Start the Airflow Environment:**
+   Make sure you have Docker Desktop running, then start the containers:
+   ```bash
+   docker compose up -d
    ```
-3. **Run the Pipeline:**
-   Open `pipeline.ipynb` and run all cells.
+
+**5. Trigger the Pipeline:**
+   * Open your browser and go to **`http://localhost:8080`**.
+   * Login to Airflow (Default credentials: `admin` / `admin`).
+   * Turn the toggle **ON** for the `election_ocr_pipeline` DAG.
+   * Click the **Play** button (▶️) and select **"Trigger DAG w/ config"**.
+   * Verify the parameters (e.g., `"amphoe": "อำเภอบ้านไร่"`) and click **Trigger**.
+
+*(Note: If you only want to run standard tests without the Airflow orchestrator, you can still open and run the cells in `pipeline.ipynb`.)*
 
 ---
 
