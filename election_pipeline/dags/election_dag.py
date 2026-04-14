@@ -76,7 +76,7 @@ def election_ocr_pipeline():
 
         return units_to_process
 
-    @task(max_active_tis_per_dag=_CONCURRENCY, execution_timeout=timedelta(minutes=10))
+    @task(max_active_tis_per_dag=_CONCURRENCY)
     def process_unit(unit_info):
         """Task 2: โหลดไฟล์ รวม PDF วิเคราะห์โครงสร้าง และทำ OCR สำหรับ '1 หน่วยเลือกตั้ง' (รันขนานกัน)"""
         if _SLEEP_SECS:
