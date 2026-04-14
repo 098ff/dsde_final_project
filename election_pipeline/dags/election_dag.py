@@ -3,6 +3,16 @@ from airflow.models.param import Param
 from datetime import datetime
 import os
 import shutil
+import time
+
+# ---------------------------------------------------------------------------
+# Rate-limit config — set RATE_LIMIT=true in .env to enable
+# When True: 1 concurrent OCR task, 3-second gap between requests (20 req/min)
+# When False: 5 concurrent OCR tasks, no delay (default)
+# ---------------------------------------------------------------------------
+RATE_LIMIT = os.getenv("RATE_LIMIT", "false").lower() == "true"
+_CONCURRENCY = 1 if RATE_LIMIT else 5
+_SLEEP_SECS  = 3 if RATE_LIMIT else 0
 
 from src.gdrive_client import get_gdrive_service, list_folders_in_folder, download_files_from_folder
 from src.processor import merge_pdfs, detect_and_route, process_pages
@@ -61,9 +71,13 @@ def election_ocr_pipeline():
         # Return ลิสต์ของหน่วยทั้งหมด เพื่อให้ Airflow เอาไปแตก Task ขนานกัน
         return units_to_process
 
-    @task(max_active_tis_per_dag=5) # จำกัดรันขนานพร้อมกัน 5 หน่วย 
+    @task(max_active_tis_per_dag=_CONCURRENCY)
     def process_unit(unit_info):
         """Task 2: โหลดไฟล์ รวม PDF วิเคราะห์โครงสร้าง และทำ OCR สำหรับ '1 หน่วยเลือกตั้ง' (รันขนานกัน)"""
+        if _SLEEP_SECS:
+            print(f"⏳ Rate-limit mode: waiting {_SLEEP_SECS}s before OCR request...")
+            time.sleep(_SLEEP_SECS)
+
         service = get_gdrive_service()
         parser = ElectionOCRParser()
         
