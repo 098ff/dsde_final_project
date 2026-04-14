@@ -22,7 +22,12 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-from validation.linguistic_validator import clean_score_to_int
+import re
+
+from validation.linguistic_validator import clean_score_to_int, validate_score
+
+# Matches Thai consonants/vowels/tone marks (excludes Thai digits ๐-๙)
+_THAI_WORD_RE = re.compile(r"[\u0E01-\u0E3A\u0E40-\u0E4E]")
 
 # ---------------------------------------------------------------------------
 # Type aliases
@@ -220,5 +225,23 @@ class ElectionValidator:
         unrecognised = raw_names - master_names
         flags["flag_name_mismatch"] = bool(unrecognised)
         flags["flag_name_mismatch_detail"] = sorted(unrecognised) if unrecognised else []
+
+        # --- flag_linguistic_mismatch: numeric digit vs Thai word cross-check -
+        # Some OCR outputs contain both a digit and a Thai word in the same
+        # score cell (e.g. "177 หนึ่งร้อยเจ็ดสิบเจ็ด"). When both parts are
+        # present, validate_score() compares them and raises the mismatch flag.
+        mismatched_scores: list[str] = []
+        for name, raw_val in raw_data.get("scores", {}).items():
+            raw_str = str(raw_val) if raw_val is not None else ""
+            if _THAI_WORD_RE.search(raw_str):
+                # Split numeric part (digits) from Thai word part (letters)
+                numeric_part = re.sub(r"[^\d๐-๙]", "", raw_str) or None
+                word_part = raw_str  # validate_score strips non-Thai internally
+                result = validate_score(numeric_part, word_part)
+                if result["flag_linguistic_mismatch"]:
+                    mismatched_scores.append(name)
+
+        flags["flag_linguistic_mismatch"] = bool(mismatched_scores)
+        flags["flag_linguistic_mismatch_detail"] = mismatched_scores if mismatched_scores else []
 
         return flags

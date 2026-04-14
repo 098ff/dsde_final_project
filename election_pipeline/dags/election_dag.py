@@ -34,8 +34,7 @@ _TYPE_MAP = {
     start_date=datetime(2023, 1, 1),
     catchup=False,
     tags=['election', 'ocr'],
-    default_args={"execution_timeout": timedelta(minutes=10)},
-    default_args={"execution_timeout": timedelta(minutes=10)},
+    default_args={"execution_timeout": timedelta(seconds=60)},
     params={
         "amphoe": Param("อำเภอบ้านไร่", type="string"),
         "tambons": Param([], type=["array", "null"], description="เว้นว่างไว้เพื่อรันทุกตำบลในอำเภอนั้น")
@@ -137,6 +136,7 @@ def election_ocr_pipeline():
                 flags_data.get("flag_math_valid_score", False),
                 flags_data.get("flag_name_mismatch", False),
                 flags_data.get("flag_missing_data", False),
+                flags_data.get("flag_linguistic_mismatch", False),
             ])
             detail_parts = [
                 flags_data.get("flag_math_total_used_detail", ""),
@@ -154,6 +154,8 @@ def election_ocr_pipeline():
                 "flag_math_total_used": flags_data.get("flag_math_total_used", False),
                 "flag_math_valid_score": flags_data.get("flag_math_valid_score", False),
                 "flag_name_mismatch": flags_data.get("flag_name_mismatch", False),
+                "flag_missing_data": flags_data.get("flag_missing_data", False),
+                "flag_linguistic_mismatch": flags_data.get("flag_linguistic_mismatch", False),
                 "details": details,
             })
 
