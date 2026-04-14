@@ -116,7 +116,11 @@ class ElectionValidator:
         }
 
         # Step 2: master-list alignment
-        candidate_names = [c.get("name", str(c)) for c in self._master_candidates]
+        # Support both string lists and dicts with a "name" key
+        candidate_names = [
+            c if isinstance(c, str) else c.get("name", str(c))
+            for c in self._master_candidates
+        ]
         for name in candidate_names:
             if name not in cleaned_scores:
                 cleaned_scores[name] = np.nan
@@ -207,7 +211,11 @@ class ElectionValidator:
             )
 
         # --- flag_name_mismatch: candidate in raw_data not in master list ----
-        master_names = {c.get("name", str(c)) for c in self._master_candidates}
+        # Support both string lists and dicts with a "name" key
+        master_names = {
+            c if isinstance(c, str) else c.get("name", str(c))
+            for c in self._master_candidates
+        }
         raw_names = set(raw_data.get("scores", {}).keys())
         unrecognised = raw_names - master_names
         flags["flag_name_mismatch"] = bool(unrecognised)

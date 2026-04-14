@@ -7,6 +7,8 @@ import numpy as np
 from PIL import Image
 from typhoon_ocr import ocr_document
 
+from validation.engine import ElectionValidator
+
 
 # table detection
 def has_table(page, threshold=15):
@@ -88,7 +90,7 @@ def detect_and_route(doc):
     return routes
 
 
-def process_pages(doc, page_indices, file_type, parser, master_list):
+def process_pages(doc, page_indices, file_type, parser, master_candidates, master_parties):
     full_text = ""
 
     for page_idx in page_indices:
@@ -129,8 +131,9 @@ def process_pages(doc, page_indices, file_type, parser, master_list):
                         time.sleep(3)
                 os.remove(tmp.name)
 
-    # นำ Text ที่ได้ไปเข้ากระบวนการ Parser (สกัดตัวเลขและเช็คความถูกต้อง)
+    # นำ Text ที่ได้ไปเข้ากระบวนการ Parser (สกัดตัวเลข) แล้ว Validate ด้วย ElectionValidator
     parsed_data = parser.parse_markdown(full_text)
-    flags_data = parser.validate_data(parsed_data, file_type, master_list=master_list)
+    validator = ElectionValidator(master_candidates, master_parties)
+    cleaned_data, flags_data = validator.validate(parsed_data)
 
-    return parsed_data, flags_data
+    return cleaned_data, flags_data

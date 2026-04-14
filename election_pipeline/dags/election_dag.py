@@ -90,10 +90,13 @@ def election_ocr_pipeline():
         
         # 3. Process each route
         for page_indices, file_type in routes:
-            current_master = MASTER_PARTIES if file_type == "บัญชีรายชื่อ" else MASTER_CANDIDATES
-            
-            # Process & Validate
-            parsed_data, flags_data = process_pages(combined_doc, page_indices, file_type, parser, current_master)
+            # Process & Validate — pass both master lists so ElectionValidator
+            # can align candidates and parties independently of file_type routing
+            parsed_data, flags_data = process_pages(
+                combined_doc, page_indices, file_type, parser,
+                master_candidates=MASTER_CANDIDATES,
+                master_parties=MASTER_PARTIES,
+            )
             
             # Set descriptive output name
             output_name = f"summary_{file_type}"
@@ -111,17 +114,31 @@ def election_ocr_pipeline():
             }
             export_individual_result(full_record, unit_info['tambon'], unit_info['unit'], output_name)
             
+            # Derive needs_manual_check from ElectionValidator flag set
+            needs_manual_check = any([
+                flags_data.get("flag_math_total_used", False),
+                flags_data.get("flag_math_valid_score", False),
+                flags_data.get("flag_name_mismatch", False),
+                flags_data.get("flag_missing_data", False),
+            ])
+            # Combine detail strings from ElectionValidator into a single summary
+            detail_parts = [
+                flags_data.get("flag_math_total_used_detail", ""),
+                flags_data.get("flag_math_valid_score_detail", ""),
+            ]
+            details = " | ".join(p for p in detail_parts if p and p != "OK") or "OK"
+
             # เก็บ Log ส่งต่อให้ Task 3
             unit_summary_logs.append({
                 "tambon": unit_info['tambon'],
                 "unit": unit_info['unit'],
                 "type": file_type,
                 "file": output_name,
-                "needs_manual_check": flags_data["needs_manual_check"],
-                "flag_math_total_used": flags_data["flag_math_total_used"],
-                "flag_math_valid_score": flags_data["flag_math_valid_score"],
-                "flag_name_mismatch": flags_data["flag_name_mismatch"],
-                "details": flags_data["flag_details"]
+                "needs_manual_check": needs_manual_check,
+                "flag_math_total_used": flags_data.get("flag_math_total_used", False),
+                "flag_math_valid_score": flags_data.get("flag_math_valid_score", False),
+                "flag_name_mismatch": flags_data.get("flag_name_mismatch", False),
+                "details": details,
             })
         
         # ลบไฟล์ Temp ทิ้งเพื่อประหยัดพื้นที่
