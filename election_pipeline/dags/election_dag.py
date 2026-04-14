@@ -10,6 +10,9 @@ from src.ocr_parser import ElectionOCRParser
 from src.exporter import export_individual_result, export_summary_report
 from src.config import MASTER_PARTIES, MASTER_CANDIDATES, GDRIVE_ROOT_FOLDER_ID
 
+from validation.structural_auditor import audit_units, generate_missing_report
+from validation.form_identifier import FORM_CONSTITUENCY, FORM_PARTY_LIST
+
 # กำหนดให้รับ Parameter ตอนกด Trigger DAG
 @dag(
     schedule_interval=None,
@@ -152,12 +155,50 @@ def election_ocr_pipeline():
         # all_unit_logs จะเป็น List of Lists -> ต้อง Flatten
         flat_logs = [log for unit_logs in all_unit_logs for log in unit_logs]
         export_summary_report(flat_logs, format_type='csv')
-        print(f"🎉 Pipeline finished. Processed {len(flat_logs)} files.")
+        print(f"Pipeline finished. Processed {len(flat_logs)} files.")
+
+    _TYPE_MAP = {
+        "บัญชีรายชื่อ": FORM_PARTY_LIST,
+        "แบ่งเขต": FORM_CONSTITUENCY,
+    }
+
+    @task
+    def run_structural_audit(all_unit_logs):
+        """Task 4: ตรวจสอบว่าทุกหน่วยเลือกตั้งมีครบทั้งแบบฟอร์ม Party List และ Constituency
+
+        รันขนานกับ aggregate_summaries หลังจาก process_unit.expand() เสร็จ
+        """
+        # Flatten list-of-lists from .expand() output
+        flat_logs = [log for unit_logs in all_unit_logs for log in unit_logs]
+
+        # Map Thai type labels to canonical form_type strings required by audit_units
+        records = [
+            {
+                "Tambon": log.get("tambon", ""),
+                "Unit": log.get("unit", ""),
+                "form_type": _TYPE_MAP.get(log.get("type", ""), "Unknown"),
+            }
+            for log in flat_logs
+        ]
+
+        missing = audit_units(records)
+
+        # Write missing-unit report; use Airflow output path when available
+        output_path = "/opt/airflow/output_data/missing_units.csv"
+        generate_missing_report(missing, output_path)
+
+        print(
+            f"Structural audit complete: {len(missing)} missing form(s) "
+            f"across {len(records)} processed records. "
+            f"Report written to {output_path}."
+        )
 
     # กำหนด Pipeline Flow
     units_list = discover_units()
     # ใช้ .expand() เพื่อสร้าง Task `process_unit` ขนานกันตามจำนวนหน่วยที่ค้นเจอ
-    processed_logs = process_unit.expand(unit_info=units_list) 
+    processed_logs = process_unit.expand(unit_info=units_list)
+    # aggregate_summaries and run_structural_audit run in parallel after process_unit
     aggregate_summaries(processed_logs)
+    run_structural_audit(processed_logs)
 
 election_dag = election_ocr_pipeline()
