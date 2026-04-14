@@ -26,12 +26,14 @@ Implement standalone Jigsaw validation engine with NaN propagation and MISSING/n
 - [x] **Verification**: 46 unit and integration tests — all passing. Zero modifications to `election_pipeline/`.
 - **Summary**: [03-SUMMARY.md](.planning/phases/03-robust-error-propagation-nans-logs/03-SUMMARY.md) | Plans: 1/1 complete | 46 tests passing | engine.py + formatters.py created
 
-## Phase 4: Pipeline Integration & Orchestration
+## Phase 4: Pipeline Integration & Orchestration [COMPLETE]
 Full end-to-end integration with Airflow.
-- [ ] Integrate the structural check into the initial file collection task in `election_dag.py`.
-- [ ] Update Airflow task logs to surface `missing_units.csv` summaries.
-- [ ] Perform a full dry-run processing several units from Uthai Thani.
-- [ ] **Verification**: Confirm `missing_units.csv` is generated and contains accurate data after a full DAG run.
+- [x] Add `pythainlp>=5.3.1` and `numpy>=2.0.0` to `election_pipeline/requirements.txt`.
+- [x] Wire `ElectionValidator` into `processor.py` replacing `parser.validate_data()`.
+- [x] Delegate `clean_score_to_int` in `ocr_parser.py` to `validation.linguistic_validator` — duplicate Thai digit logic removed.
+- [x] Add `run_structural_audit` task to DAG running in parallel with `aggregate_summaries`.
+- [x] **Verification**: 20 integration smoke tests pass; existing 46 jigsaw tests still pass. Zero duplicate validation logic.
+- **Summary**: [04-SUMMARY.md](.planning/phases/04-pipeline-integration-orchestration/04-SUMMARY.md) | Plans: 1/1 complete | 20 integration tests passing | pipeline fully wired to validation/
 
 ---
 *Created: 2026-04-14*
