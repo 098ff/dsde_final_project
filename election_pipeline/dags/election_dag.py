@@ -34,7 +34,7 @@ _TYPE_MAP = {
     start_date=datetime(2023, 1, 1),
     catchup=False,
     tags=['election', 'ocr'],
-    default_args={"execution_timeout": timedelta(seconds=60)},
+    default_args={"execution_timeout": timedelta(seconds=300)},
     params={
         "amphoe": Param("อำเภอบ้านไร่", type="string"),
         "tambons": Param([], type=["array", "null"], description="เว้นว่างไว้เพื่อรันทุกตำบลในอำเภอนั้น")
