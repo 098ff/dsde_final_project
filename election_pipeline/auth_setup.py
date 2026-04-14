@@ -1,4 +1,3 @@
-# ไฟล์: auth_setup.py
 import os
 from src.gdrive_client import get_gdrive_service
 
