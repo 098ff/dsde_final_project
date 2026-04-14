@@ -18,12 +18,13 @@ Ensure every station has a complete set of election types.
 - [x] **Verification**: 30 tests passing across form identifier, audit logic, and CSV report generation.
 - **Summary**: [02-SUMMARY.md](.planning/phases/02-structural-integrity-missing-unit-detection/02-SUMMARY.md) | Plans: 1/1 complete | 30 tests passing | form_identifier.py + structural_auditor.py created
 
-## Phase 3: Robust Error Propagation (NANs & Logs)
-Modernize how missing and invalid data are handled in the pipeline.
-- [ ] Update `ElectionOCRParser.parse_markdown` to return `np.nan` for missing fields instead of `0`.
-- [ ] Update `validate_data` to handle `NaN` inputs without crashing.
-- [ ] Refactor the exporter to ensure `NaN` values are correctly persisted in final CSVs/JSONs.
-- [ ] **Verification**: Mock a failed OCR response and confirm `NaN` appears in the output dataframe.
+## Phase 3: Robust Error Propagation (NANs & Logs) [COMPLETE]
+Implement standalone Jigsaw validation engine with NaN propagation and MISSING/null formatters.
+- [x] Refactor `clean_score_to_int` to return `np.nan` for missing-data sentinels (`None`, `""`, `"-"`, `"—"`, `"."`).
+- [x] Implement `ElectionValidator` jigsaw engine with master-list alignment and math consistency flags.
+- [x] Implement `prepare_df_for_csv` (na_rep="MISSING") and `prepare_data_for_json` (NaN->None) formatters.
+- [x] **Verification**: 46 unit and integration tests — all passing. Zero modifications to `election_pipeline/`.
+- **Summary**: [03-SUMMARY.md](.planning/phases/03-robust-error-propagation-nans-logs/03-SUMMARY.md) | Plans: 1/1 complete | 46 tests passing | engine.py + formatters.py created
 
 ## Phase 4: Pipeline Integration & Orchestration
 Full end-to-end integration with Airflow.
