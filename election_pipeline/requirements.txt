@@ -6,5 +6,6 @@ thefuzz
 python-dotenv
 PyMuPDF
 Pillow
+opencv-python-headless
 typhoon-ocr
 apache-airflow

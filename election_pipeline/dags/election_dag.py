@@ -5,7 +5,7 @@ import os
 import shutil
 
 from src.gdrive_client import get_gdrive_service, list_folders_in_folder, download_files_from_folder
-from src.processor import process_pdf
+from src.processor import merge_pdfs, detect_and_route, process_pages
 from src.ocr_parser import ElectionOCRParser
 from src.exporter import export_individual_result, export_summary_report
 from src.config import MASTER_PARTIES, MASTER_CANDIDATES, GDRIVE_ROOT_FOLDER_ID
@@ -18,7 +18,7 @@ from src.config import MASTER_PARTIES, MASTER_CANDIDATES, GDRIVE_ROOT_FOLDER_ID
     tags=['election', 'ocr'],
     params={
         "amphoe": Param("อำเภอบ้านไร่", type="string"),
-        "tambons": Param([], type="array", description="เว้นว่างไว้เพื่อรันทุกตำบลในอำเภอนั้น")
+        "tambons": Param([], type=["array", "null"], description="เว้นว่างไว้เพื่อรันทุกตำบลในอำเภอนั้น")
     }
 )
 def election_ocr_pipeline():
@@ -39,7 +39,7 @@ def election_ocr_pipeline():
         
         # 2. หาโฟลเดอร์ตำบล
         tambon_folders = list_folders_in_folder(service, amphoe_id)
-        if target_tambons: # ถ้าระบุมาให้ Filter
+        if target_tambons: # ถ้าระบุมาให้ Filter (ตัวแปรอาจเป็น None หรือ [] ได้)
             tambon_folders = [t for t in tambon_folders if t['name'] in target_tambons]
             
         units_to_process = []
@@ -60,7 +60,7 @@ def election_ocr_pipeline():
 
     @task(max_active_tis_per_dag=5) # จำกัดรันขนานพร้อมกัน 5 หน่วย 
     def process_unit(unit_info):
-        """Task 2: โหลดไฟล์และทำ OCR สำหรับ '1 หน่วยเลือกตั้ง' (รันขนานกัน)"""
+        """Task 2: โหลดไฟล์ รวม PDF วิเคราะห์โครงสร้าง และทำ OCR สำหรับ '1 หน่วยเลือกตั้ง' (รันขนานกัน)"""
         service = get_gdrive_service()
         parser = ElectionOCRParser()
         
@@ -69,37 +69,64 @@ def election_ocr_pipeline():
         
         unit_summary_logs = []
         
-        for pdf_path in pdf_paths:
-            file_name = os.path.basename(pdf_path)
-            file_type = "บัญชีรายชื่อ" if "บช" in file_name else "แบ่งเขต"
+        if not pdf_paths:
+            print(f"⚠️ No PDF files found in unit: {unit_info['unit']}")
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return unit_summary_logs
+        
+        # 1. Merge all PDF files into a single document (sorted by filename)
+        combined_doc = merge_pdfs(pdf_paths)
+        print(f"📄 Merged {len(pdf_paths)} files -> {len(combined_doc)} pages | Unit: {unit_info['unit']}")
+        
+        # 2. Analyze page structure and determine OCR routes
+        routes = detect_and_route(combined_doc)
+        
+        if routes is None:
+            # Anomaly detected -> skip this unit but allow pipeline to continue
+            print(f"⚠️ Skipping unit {unit_info['unit']} due to unexpected page count/structure ({len(combined_doc)} pages)")
+            combined_doc.close()
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return unit_summary_logs
+        
+        # 3. Process each route
+        for page_indices, file_type in routes:
             current_master = MASTER_PARTIES if file_type == "บัญชีรายชื่อ" else MASTER_CANDIDATES
             
             # Process & Validate
-            parsed_data, flags_data = process_pdf(pdf_path, file_type, parser, current_master)
+            parsed_data, flags_data = process_pages(combined_doc, page_indices, file_type, parser, current_master)
             
-            # Save CSV/JSON ลงเครื่อง
+            # Set descriptive output name
+            output_name = f"summary_{file_type}"
+            
+            # Save CSV/JSON result
             full_record = {
-                "metadata": {"amphoe": unit_info['amphoe'], "tambon": unit_info['tambon'], "unit": unit_info['unit'], "file": file_name},
+                "metadata": {
+                    "amphoe": unit_info['amphoe'], 
+                    "tambon": unit_info['tambon'], 
+                    "unit": unit_info['unit'], 
+                    "file": output_name
+                },
                 **parsed_data,
                 **flags_data
             }
-            export_individual_result(full_record, unit_info['tambon'], unit_info['unit'], file_name)
+            export_individual_result(full_record, unit_info['tambon'], unit_info['unit'], output_name)
             
             # เก็บ Log ส่งต่อให้ Task 3
             unit_summary_logs.append({
                 "tambon": unit_info['tambon'],
                 "unit": unit_info['unit'],
                 "type": file_type,
-                "file": file_name,
+                "file": output_name,
                 "needs_manual_check": flags_data["needs_manual_check"],
                 "flag_math_total_used": flags_data["flag_math_total_used"],
                 "flag_math_valid_score": flags_data["flag_math_valid_score"],
                 "flag_name_mismatch": flags_data["flag_name_mismatch"],
                 "details": flags_data["flag_details"]
             })
-            
+        
         # ลบไฟล์ Temp ทิ้งเพื่อประหยัดพื้นที่
-        shutil.rmtree(temp_dir)
+        combined_doc.close()
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return unit_summary_logs
 
     @task
