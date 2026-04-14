@@ -1,6 +1,6 @@
 from airflow.decorators import dag, task
 from airflow.models.param import Param
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import shutil
 import time
@@ -20,8 +20,13 @@ from src.ocr_parser import ElectionOCRParser
 from src.exporter import export_individual_result, export_summary_report
 from src.config import MASTER_PARTIES, MASTER_CANDIDATES, GDRIVE_ROOT_FOLDER_ID
 
-from validation.structural_auditor import audit_units, generate_missing_report
+from validation.structural_auditor import audit_units
 from validation.form_identifier import FORM_CONSTITUENCY, FORM_PARTY_LIST
+
+_TYPE_MAP = {
+    "บัญชีรายชื่อ": FORM_PARTY_LIST,
+    "แบ่งเขต":      FORM_CONSTITUENCY,
+}
 
 # กำหนดให้รับ Parameter ตอนกด Trigger DAG
 @dag(
@@ -42,21 +47,21 @@ def election_ocr_pipeline():
         params = kwargs['params']
         target_amphoe = params['amphoe']
         target_tambons = params['tambons']
-        
+
         service = get_gdrive_service()
-        
+
         # 1. หาโฟลเดอร์อำเภอ
         amphoe_folders = list_folders_in_folder(service, GDRIVE_ROOT_FOLDER_ID, target_amphoe)
         if not amphoe_folders: raise ValueError(f"ไม่พบโฟลเดอร์อำเภอ {target_amphoe}")
         amphoe_id = amphoe_folders[0]['id']
-        
+
         # 2. หาโฟลเดอร์ตำบล
         tambon_folders = list_folders_in_folder(service, amphoe_id)
-        if target_tambons: # ถ้าระบุมาให้ Filter (ตัวแปรอาจเป็น None หรือ [] ได้)
+        if target_tambons:
             tambon_folders = [t for t in tambon_folders if t['name'] in target_tambons]
-            
+
         units_to_process = []
-        
+
         # 3. หาโฟลเดอร์หน่วยเลือกตั้งในแต่ละตำบล
         for tambon in tambon_folders:
             unit_folders = list_folders_in_folder(service, tambon['id'])
@@ -67,11 +72,10 @@ def election_ocr_pipeline():
                     "unit": unit['name'],
                     "folder_id": unit['id']
                 })
-                
-        # Return ลิสต์ของหน่วยทั้งหมด เพื่อให้ Airflow เอาไปแตก Task ขนานกัน
+
         return units_to_process
 
-    @task(max_active_tis_per_dag=_CONCURRENCY)
+    @task(max_active_tis_per_dag=_CONCURRENCY, execution_timeout=timedelta(minutes=10))
     def process_unit(unit_info):
         """Task 2: โหลดไฟล์ รวม PDF วิเคราะห์โครงสร้าง และทำ OCR สำหรับ '1 หน่วยเลือกตั้ง' (รันขนานกัน)"""
         if _SLEEP_SECS:
@@ -80,73 +84,66 @@ def election_ocr_pipeline():
 
         service = get_gdrive_service()
         parser = ElectionOCRParser()
-        
+
         temp_dir = f"/tmp/election_data/{unit_info['amphoe']}/{unit_info['tambon']}/{unit_info['unit']}"
         pdf_paths = download_files_from_folder(service, unit_info['folder_id'], temp_dir)
-        
+
         unit_summary_logs = []
-        
+
         if not pdf_paths:
             print(f"⚠️ No PDF files found in unit: {unit_info['unit']}")
             shutil.rmtree(temp_dir, ignore_errors=True)
             return unit_summary_logs
-        
+
         # 1. Merge all PDF files into a single document (sorted by filename)
         combined_doc = merge_pdfs(pdf_paths)
         print(f"📄 Merged {len(pdf_paths)} files -> {len(combined_doc)} pages | Unit: {unit_info['unit']}")
-        
+
         # 2. Analyze page structure and determine OCR routes
         routes = detect_and_route(combined_doc)
-        
+
         if routes is None:
-            # Anomaly detected -> skip this unit but allow pipeline to continue
             print(f"⚠️ Skipping unit {unit_info['unit']} due to unexpected page count/structure ({len(combined_doc)} pages)")
             combined_doc.close()
             shutil.rmtree(temp_dir, ignore_errors=True)
             return unit_summary_logs
-        
+
         # 3. Process each route
         for page_indices, file_type in routes:
-            # Process & Validate — pass both master lists so ElectionValidator
-            # can align candidates and parties independently of file_type routing
             parsed_data, flags_data = process_pages(
                 combined_doc, page_indices, file_type, parser,
                 master_candidates=MASTER_CANDIDATES,
                 master_parties=MASTER_PARTIES,
             )
-            
-            # Set descriptive output name
+
             output_name = f"summary_{file_type}"
-            
-            # Save CSV/JSON result
+
             full_record = {
                 "metadata": {
-                    "amphoe": unit_info['amphoe'], 
-                    "tambon": unit_info['tambon'], 
-                    "unit": unit_info['unit'], 
+                    "amphoe": unit_info['amphoe'],
+                    "tambon": unit_info['tambon'],
+                    "unit": unit_info['unit'],
                     "file": output_name
                 },
                 **parsed_data,
                 **flags_data
             }
             export_individual_result(full_record, unit_info['tambon'], unit_info['unit'], output_name)
-            
-            # Derive needs_manual_check from ElectionValidator flag set
+
             needs_manual_check = any([
                 flags_data.get("flag_math_total_used", False),
                 flags_data.get("flag_math_valid_score", False),
                 flags_data.get("flag_name_mismatch", False),
                 flags_data.get("flag_missing_data", False),
             ])
-            # Combine detail strings from ElectionValidator into a single summary
             detail_parts = [
                 flags_data.get("flag_math_total_used_detail", ""),
                 flags_data.get("flag_math_valid_score_detail", ""),
             ]
             details = " | ".join(p for p in detail_parts if p and p != "OK") or "OK"
 
-            # เก็บ Log ส่งต่อให้ Task 3
             unit_summary_logs.append({
+                "amphoe": unit_info['amphoe'],
                 "tambon": unit_info['tambon'],
                 "unit": unit_info['unit'],
                 "type": file_type,
@@ -157,62 +154,49 @@ def election_ocr_pipeline():
                 "flag_name_mismatch": flags_data.get("flag_name_mismatch", False),
                 "details": details,
             })
-        
-        # ลบไฟล์ Temp ทิ้งเพื่อประหยัดพื้นที่
+
         combined_doc.close()
         shutil.rmtree(temp_dir, ignore_errors=True)
         return unit_summary_logs
 
     @task
     def aggregate_summaries(all_unit_logs):
-        """Task 3: รวบรวม Log จากทุกๆ หน่วย (ที่รันขนานกันเสร็จแล้ว) มาเซฟเป็น Master Log ไฟล์เดียว"""
-        # all_unit_logs จะเป็น List of Lists -> ต้อง Flatten
-        flat_logs = [log for unit_logs in all_unit_logs for log in unit_logs]
-        export_summary_report(flat_logs, format_type='csv')
-        print(f"Pipeline finished. Processed {len(flat_logs)} files.")
-
-    _TYPE_MAP = {
-        "บัญชีรายชื่อ": FORM_PARTY_LIST,
-        "แบ่งเขต": FORM_CONSTITUENCY,
-    }
-
-    @task
-    def run_structural_audit(all_unit_logs):
-        """Task 4: ตรวจสอบว่าทุกหน่วยเลือกตั้งมีครบทั้งแบบฟอร์ม Party List และ Constituency
-
-        รันขนานกับ aggregate_summaries หลังจาก process_unit.expand() เสร็จ
-        """
-        # Flatten list-of-lists from .expand() output
+        """Task 3: รวบรวม Log + ตรวจสอบความครบถ้วนของแบบฟอร์ม แล้วเซฟเป็น master_summary_log.csv"""
         flat_logs = [log for unit_logs in all_unit_logs for log in unit_logs]
 
-        # Map Thai type labels to canonical form_type strings required by audit_units
+        # --- Structural audit: stamp flag_missing_counterpart on every row ---
         records = [
             {
-                "Tambon": log.get("tambon", ""),
-                "Unit": log.get("unit", ""),
-                "form_type": _TYPE_MAP.get(log.get("type", ""), "Unknown"),
+                "Tambon": log["tambon"],
+                "Unit":   log["unit"],
+                "form_type": _TYPE_MAP.get(log["type"], "Unknown"),
             }
             for log in flat_logs
         ]
+        missing_items = audit_units(records)
 
-        missing = audit_units(records)
+        # Build a set of (tambon, unit) pairs that are missing their counterpart
+        incomplete_stations = {
+            (item["Tambon"], item["Unit"])
+            for item in missing_items
+        }
 
-        # Write missing-unit report; use Airflow output path when available
-        output_path = "/opt/airflow/output_data/missing_units.csv"
-        generate_missing_report(missing, output_path)
+        for log in flat_logs:
+            log["flag_missing_counterpart"] = (
+                log["tambon"], log["unit"]
+            ) in incomplete_stations
 
+        export_summary_report(flat_logs, format_type='csv')
+
+        missing_count = len({(i["Tambon"], i["Unit"]) for i in missing_items})
         print(
-            f"Structural audit complete: {len(missing)} missing form(s) "
-            f"across {len(records)} processed records. "
-            f"Report written to {output_path}."
+            f"Pipeline finished. Processed {len(flat_logs)} records. "
+            f"{missing_count} station(s) flagged with flag_missing_counterpart=True."
         )
 
     # กำหนด Pipeline Flow
     units_list = discover_units()
-    # ใช้ .expand() เพื่อสร้าง Task `process_unit` ขนานกันตามจำนวนหน่วยที่ค้นเจอ
     processed_logs = process_unit.expand(unit_info=units_list)
-    # aggregate_summaries and run_structural_audit run in parallel after process_unit
     aggregate_summaries(processed_logs)
-    run_structural_audit(processed_logs)
 
 election_dag = election_ocr_pipeline()
