@@ -38,21 +38,59 @@ def normalize_numerals(s: str) -> str:
     return re.sub(r"[^\d]", "", s)
 
 
-def clean_score_to_int(s: str) -> int | None:
+def clean_score_to_int(s: str) -> int | float:
     """Strip punctuation from *s*, normalize numerals, and return an integer.
+
+    Strings that represent missing or invalid data (``None``, empty string,
+    ``"-"``, ``"—"``, ``"."``) return ``numpy.nan`` so that downstream math
+    validation can propagate missing-data signals without masking real zeros.
 
     Args:
         s: Raw score string extracted from OCR output.
 
     Returns:
-        Integer value or None if the string contains no recognisable digits.
+        Integer value or ``numpy.nan`` if the string contains no recognisable
+        digits or represents a missing-data sentinel.
     """
     if s is None:
-        return None
-    digits = normalize_numerals(str(s))
+        return np.nan
+    # Explicit missing-data sentinels
+    stripped = str(s).strip()
+    if stripped in ("", "-", "\u2014", "."):
+        return np.nan
+    digits = normalize_numerals(stripped)
     if not digits:
-        return None
-    return int(digits)
+        return np.nan
+    try:
+        return int(digits)
+    except ValueError:
+        return np.nan
+
+
+# ---------------------------------------------------------------------------
+# Future integration hook (Phase 1 cross-check skeleton)
+# ---------------------------------------------------------------------------
+
+
+def validate_thai_word(arabic_num: int | float | None, thai_word: str | None) -> dict:
+    """Skeleton for Phase 1 linguistic cross-check integration.
+
+    Compares a resolved integer score (*arabic_num*) against the Thai number
+    word representation (*thai_word*).  Currently delegates to
+    :func:`validate_score` using the integer as the numeric string.
+
+    Args:
+        arabic_num: Resolved integer score, or ``np.nan`` / ``None`` when
+            missing.
+        thai_word:  Thai number word string as returned by OCR.
+
+    Returns:
+        Validation result dict with ``"value"``, ``"flag_linguistic_mismatch"``,
+        and ``"needs_manual_check"`` keys (same schema as
+        :func:`validate_score`).
+    """
+    numeric_str = None if (arabic_num is None or (isinstance(arabic_num, float) and np.isnan(arabic_num))) else str(int(arabic_num))
+    return validate_score(numeric_str, thai_word)
 
 
 # ---------------------------------------------------------------------------
