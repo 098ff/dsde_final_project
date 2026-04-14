@@ -1,5 +1,4 @@
 import re
-from thefuzz import fuzz
 
 from validation.linguistic_validator import clean_score_to_int, thai_word_to_int  # noqa: F401
 
@@ -37,42 +36,6 @@ class ElectionOCRParser:
             data['scores'][clean_name] = self.clean_score_to_int(score)
 
         return data
-
-    def validate_data(self, data, file_type, master_list=None, threshold=80):
-        flags = {"flag_math_total_used": False, "flag_math_valid_score": False,
-                 "flag_name_mismatch": False, "flag_details": []}
-
-        # --- 1. Similarity Mapping ---
-        normalized_scores = {}
-        if master_list:
-            for name, score in data['scores'].items():
-                best_match, score_ratio = None, 0
-                for m_name in master_list:
-                    ratio = fuzz.ratio(name, m_name)
-                    if ratio > score_ratio:
-                        best_match, score_ratio = m_name, ratio
-
-                if score_ratio >= threshold:
-                    normalized_scores[best_match] = normalized_scores.get(best_match, 0) + score
-                else:
-                    normalized_scores[name] = score
-                    flags["flag_name_mismatch"] = True
-            data['scores'] = normalized_scores
-
-        # --- 2. Math Validation ---
-        sum_ballots = data['valid_ballots'] + data['invalid_ballots'] + data['no_vote_ballots']
-        if data['ballots_used'] != sum_ballots:
-            flags["flag_math_total_used"] = True
-            flags["flag_details"].append(f"บัตรใช้({data['ballots_used']}) != รวมย่อย({sum_ballots})")
-
-        sum_scores = sum(data['scores'].values())
-        if data['valid_ballots'] != sum_scores:
-            flags["flag_math_valid_score"] = True
-            flags["flag_details"].append(f"บัตรดี({data['valid_ballots']}) != รวมคะแนน({sum_scores})")
-
-        flags["needs_manual_check"] = any([flags["flag_math_total_used"], flags["flag_math_valid_score"], flags["flag_name_mismatch"]])
-        flags["flag_details"] = " | ".join(flags["flag_details"]) if flags["flag_details"] else "OK"
-        return flags
 
     def extract_number(self, pattern, text):
         match = re.search(pattern, text)
