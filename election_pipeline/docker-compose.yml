@@ -20,6 +20,7 @@ x-airflow-common:
     - ./src:/opt/airflow/src
     - ./credentials:/opt/airflow/credentials
     - ./output_data:/opt/airflow/output_data
+    - ../validation:/opt/airflow/validation
     
     # ถ้า DAG ของคุณรันไฟล์ PDF จากโฟลเดอร์นี้ในเครื่อง (เหมือนในไฟล์ pipeline.ipynb) ให้เปิดใช้บรรทัดล่างนี้:
     # - ./อำเภอบ้านไร่:/opt/airflow/อำเภอบ้านไร่
