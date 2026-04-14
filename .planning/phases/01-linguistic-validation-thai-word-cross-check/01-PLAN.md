@@ -3,7 +3,7 @@
 Implement the cross-check between numeric digits and Thai number words in the election OCR results.
 
 ## Phase Objective
-Create a robust validation layer that uses `PyThaiNLP` to verify score consistency and flags discrepancies for human audit.
+Create a robust, standalone validation module that uses `PyThaiNLP` to verify score consistency and flags discrepancies for human audit. The module lives at `validation/linguistic_validator.py` (project root, outside `election_pipeline/`).
 
 ## Requirements Addressed
 - **REQ-001**: Linguistic Cross-Check (Thai Word to Number)
@@ -20,31 +20,33 @@ Create a robust validation layer that uses `PyThaiNLP` to verify score consisten
 Logical first step to ensure environment and utilities are ready.
 
 ### Task 01: Update Dependencies
-Add `pythainlp` to the project requirements.
-- **Files Modified**: [requirements.txt](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/requirements.txt)
-- **Read First**: [requirements.txt](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/requirements.txt)
-- **Action**: Add `pythainlp>=5.3.1` to the list.
-- **Acceptance Criteria**: `pip install -r requirements.txt` succeeds and `import pythainlp` works in a python shell.
+Add `pythainlp` to the root `pyproject.toml`.
+- **Files Modified**: [pyproject.toml](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/pyproject.toml)
+- **Read First**: [pyproject.toml](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/pyproject.toml)
+- **Action**: Add `pythainlp>=5.3.1` to the `dependencies` list in `pyproject.toml`.
+- **Acceptance Criteria**: `pyproject.toml` contains `pythainlp>=5.3.1` in its dependencies list.
 
 ---
 
 ## Wave 2: Core Parsing Logic
-Implementation of the extraction and conversion logic.
+Implementation of standalone utilities.
 
-### Task 02: Enhance Digits Normalization
-Update the parser to handle both Arabic and Thai digits consistently.
-- **Files Modified**: [ocr_parser.py](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/election_pipeline/src/ocr_parser.py)
-- **Read First**: [ocr_parser.py](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/election_pipeline/src/ocr_parser.py) (Lines 5-20)
-- **Action**: 
-    - Improve `clean_score_to_int` to handle Thai digits `๐-๙` and strip punctuation more effectively.
-    - Create a helper `normalize_numerals(s)` to convert any combination of Arabic/Thai digits to a clean integer string.
+### Task 02: Implement Digits Normalization
+Create the `validation/` package with a helper to normalize Thai and Arabic digits.
+- **Files Modified**: [NEW] `validation/__init__.py`, [NEW] `validation/linguistic_validator.py`
+- **Read First**: [01-RESEARCH.md](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/.planning/phases/01-linguistic-validation-thai-word-cross-check/01-RESEARCH.md)
+- **Action**:
+    - Create `validation/__init__.py` (empty).
+    - Create `validation/linguistic_validator.py` with:
+        - `normalize_numerals(s)` — converts any combination of Arabic/Thai digits (`๐-๙`) to a clean integer string.
+        - `clean_score_to_int(s)` — strips punctuation and calls `normalize_numerals`, returns `int` or `None`.
 - **Acceptance Criteria**: `clean_score_to_int("๑๗๗")` returns `177`.
 
 ### Task 03: Implement Linguistic Conversion
-Add the ability to convert Thai number words to integers with normalization.
-- **Files Modified**: [ocr_parser.py](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/election_pipeline/src/ocr_parser.py)
+Add Thai word-to-integer conversion to `validation/linguistic_validator.py`.
+- **Files Modified**: `validation/linguistic_validator.py`
 - **Read First**: [01-RESEARCH.md](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/.planning/phases/01-linguistic-validation-thai-word-cross-check/01-RESEARCH.md)
-- **Action**: 
+- **Action**:
     - Implement `thai_word_to_int(word_str)`:
         - Normalize: Remove non-Thai characters and all whitespace.
         - Convert: Use `pythainlp.util.thaiword_to_num`.
@@ -54,20 +56,19 @@ Add the ability to convert Thai number words to integers with normalization.
 ---
 
 ## Wave 3: Integration & Validation
-Hooking the logic into the extraction pipeline.
+Cross-check logic as a self-contained function.
 
-### Task 04: Update Extraction and Cross-Check
-Revise `parse_markdown` and `validate_data` to perform the cross-check.
-- **Files Modified**: [ocr_parser.py](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/election_pipeline/src/ocr_parser.py)
-- **Read First**: [ocr_parser.py](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/election_pipeline/src/ocr_parser.py) (Line 46), [01-CONTEXT.md](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/.planning/phases/01-linguistic-validation-thai-word-cross-check/01-CONTEXT.md)
+### Task 04: Implement Cross-Check Function
+Add the comparison logic to `validation/linguistic_validator.py`.
+- **Files Modified**: `validation/linguistic_validator.py`
+- **Read First**: [01-CONTEXT.md](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/.planning/phases/01-linguistic-validation-thai-word-cross-check/01-CONTEXT.md)
 - **Action**:
-    - Update `parse_markdown`:
-        - Use a flexible regex to capture both the number and the (word) part: `([\d๐-๙]+)\s*(?:\(?([\u0E01-\u0E7F\s]+)\)?)?`.
-        - Store both `numeric_val` and `linguistic_val` temporarily (or in a validation object).
-    - Update `validate_data`:
-        - Compare `numeric_val` and `linguistic_val`.
-        - If mismatch: set `flag_linguistic_mismatch = True`, `needs_manual_check = True`, and replace the numeric value with `np.nan` in the data dictionary.
-- **Acceptance Criteria**: `validate_data` with inputs `177` and `หนึ่งร้อยหกสิบ` returns `flag_linguistic_mismatch: True` and data contains `NaN`.
+    - Implement `validate_score(numeric_str, word_str)` that:
+        - Converts both inputs using `clean_score_to_int` and `thai_word_to_int`.
+        - Returns a dict: `{"value": int_or_nan, "flag_linguistic_mismatch": bool, "needs_manual_check": bool}`.
+        - If mismatch: sets `flag_linguistic_mismatch = True`, `needs_manual_check = True`, `value = np.nan`.
+        - If either input is unparseable: also sets `needs_manual_check = True`.
+- **Acceptance Criteria**: `validate_score("177", "หนึ่งร้อยหกสิบ")` returns `flag_linguistic_mismatch: True` and `value` is `NaN`.
 
 ---
 
@@ -76,10 +77,11 @@ Atomic check of the entire implementation.
 
 ### Task 05: Validation Tests
 Run unit tests to verify all 8 dimensions of the validation strategy.
-- **Files Modified**: [NEW] [test_linguistic_validation.py](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/.planning/phases/01-linguistic-validation-thai-word-cross-check/test_linguistic_validation.py)
+- **Files Modified**: [NEW] `validation/test_linguistic_validator.py`
 - **Read First**: [01-VALIDATION.md](file:///home/chatrin/Documents/Chat/CU/Year-3/2110446_DSDE_2025s2/dsde_final_project/.planning/phases/01-linguistic-validation-thai-word-cross-check/01-VALIDATION.md)
-- **Action**: Create a script that instantiates `ElectionOCRParser` and passes test strings defined in `VALIDATION.md`.
-- **Acceptance Criteria**: Script should exit with status 0 and all test cases pass.
+- **Action**: Create a test script that imports from `validation.linguistic_validator` and runs test cases from `VALIDATION.md`.
+- **Acceptance Criteria**: Script exits with status 0 and all test cases pass.
 
 ---
 *Created: 2026-04-14*
+*Updated: 2026-04-14 — redirected to standalone validation/ module, not election_pipeline/*
