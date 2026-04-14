@@ -1,5 +1,6 @@
 from airflow.decorators import dag, task
 from airflow.models.param import Param
+from airflow.utils.trigger_rule import TriggerRule
 from datetime import datetime, timedelta
 import os
 import shutil
@@ -163,10 +164,20 @@ def election_ocr_pipeline():
         shutil.rmtree(temp_dir, ignore_errors=True)
         return unit_summary_logs
 
-    @task
-    def aggregate_summaries(all_unit_logs):
+    @task(trigger_rule=TriggerRule.ALL_DONE)
+    def aggregate_summaries(all_unit_logs, **kwargs):
         """Task 3: รวบรวม Log + ตรวจสอบความครบถ้วนของแบบฟอร์ม แล้วเซฟเป็น master_summary_log.csv"""
-        flat_logs = [log for unit_logs in all_unit_logs for log in unit_logs]
+        # Failed mapped tasks return None for their slot — skip them safely.
+        failed_count = sum(1 for unit_logs in all_unit_logs if unit_logs is None)
+        flat_logs = [
+            log
+            for unit_logs in all_unit_logs
+            if unit_logs is not None
+            for log in unit_logs
+        ]
+
+        if failed_count:
+            print(f"⚠️ {failed_count} process_unit task(s) failed — their units are absent from this report.")
 
         # --- Structural audit: stamp flag_missing_counterpart on every row ---
         records = [
@@ -196,6 +207,7 @@ def election_ocr_pipeline():
         print(
             f"Pipeline finished. Processed {len(flat_logs)} records. "
             f"{missing_count} station(s) flagged with flag_missing_counterpart=True."
+            + (f" {failed_count} unit(s) skipped due to task failure." if failed_count else "")
         )
 
     # กำหนด Pipeline Flow
