@@ -153,7 +153,7 @@ generate_missing_report(missing, "output_data/missing_units.csv")
 
 Run tests:
 ```bash
-uv run pytest validation/
+cd election_pipeline && uv run pytest validation/tests/
 ```
 
 ---

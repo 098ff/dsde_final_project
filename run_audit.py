@@ -1,4 +1,6 @@
+import sys
 import pandas as pd
+sys.path.insert(0, "election_pipeline")
 from validation.structural_auditor import audit_units, generate_missing_report
 
 df = pd.read_csv("election_pipeline/output_data/master_summary_log.csv", encoding="utf-8-sig")

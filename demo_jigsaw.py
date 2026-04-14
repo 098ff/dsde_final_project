@@ -1,8 +1,10 @@
 """
 Demo: Jigsaw Validation Engine Integration
 
-This script demonstrates how the election_pipeline would call the new
-validation module without any coupling between the two codebases.
+This script demonstrates how the election_pipeline calls the validation
+module. Run from the project root:
+
+    uv run python demo_jigsaw.py
 
 The "Jigsaw" interface is:
     validator = ElectionValidator(master_candidates, master_parties)
@@ -15,9 +17,11 @@ Run with:
 from __future__ import annotations
 
 import json
+import sys
 import numpy as np
 import pandas as pd
 
+sys.path.insert(0, "election_pipeline")
 from validation.engine import ElectionValidator
 from validation.formatters import prepare_df_for_csv, prepare_data_for_json
 
