@@ -14,4 +14,12 @@ dependencies = [
 ]
 
 [tool.uv.workspace]
-members = ["wikipedia-scraped"]
+members = [
+    "wikipedia-scraped",
+    "election_pipeline",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
