@@ -2,12 +2,13 @@
 
 Phased execution plan for enhancing the election pipeline validation layer.
 
-## Phase 1: Linguistic Validation (Thai Word Cross-Check)
+## Phase 1: Linguistic Validation (Thai Word Cross-Check) [COMPLETE]
 Implement the core logic to verify consistency between numeric and text-based scores.
-- [ ] Install and integrate `PyThaiNLP`.
-- [ ] Upgrade `clean_score_to_int` to extract both parenthetical Thai words and Arabic numbers.
-- [ ] Add `flag_linguistic_mismatch` to the validation engine.
-- [ ] **Verification**: Unit test with `8 (แปด)` and `193 (หนึ่งร้อยห้าสิบ)`.
+- [x] Install and integrate `PyThaiNLP`.
+- [x] Upgrade `clean_score_to_int` to extract both parenthetical Thai words and Arabic numbers.
+- [x] Add `flag_linguistic_mismatch` to the validation engine.
+- [x] **Verification**: Unit test with `8 (แปด)` and `193 (หนึ่งร้อยห้าสิบ)` — 22 tests passing.
+- **Summary**: [01-SUMMARY.md](.planning/phases/01-linguistic-validation-thai-word-cross-check/01-SUMMARY.md) | Plans: 1/1 complete
 
 ## Phase 2: Structural Integrity (Missing Unit Detection)
 Ensure every station has a complete set of election types.
