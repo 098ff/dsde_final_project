@@ -145,10 +145,12 @@ def election_ocr_pipeline():
                 flags_data.get("flag_name_mismatch", False),
                 flags_data.get("flag_missing_data", False),
                 flags_data.get("flag_linguistic_mismatch", False),
+                flags_data.get("flag_ocr_timeout", False),
             ])
             detail_parts = [
                 flags_data.get("flag_math_total_used_detail", ""),
                 flags_data.get("flag_math_valid_score_detail", ""),
+                flags_data.get("flag_ocr_timeout_detail", ""),
             ]
             details = " | ".join(p for p in detail_parts if p and p != "OK") or "OK"
 
@@ -164,6 +166,7 @@ def election_ocr_pipeline():
                 "flag_name_mismatch": flags_data.get("flag_name_mismatch", False),
                 "flag_missing_data": flags_data.get("flag_missing_data", False),
                 "flag_linguistic_mismatch": flags_data.get("flag_linguistic_mismatch", False),
+                "flag_ocr_timeout": flags_data.get("flag_ocr_timeout", False),
                 "details": details,
             })
 

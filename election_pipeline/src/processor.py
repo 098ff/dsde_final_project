@@ -17,8 +17,8 @@ except ImportError:
 
 # Hard cap per individual OCR API call — prevents the OpenAI client from blocking
 # indefinitely when the server accepts the connection but never returns a response.
-# 3 retries × 45s = 135s max per image chunk, well within the 300s task timeout.
-_OCR_CALL_TIMEOUT = 45
+# 3 retries × 80s = 240s max per image chunk, well within the 300s task timeout.
+_OCR_CALL_TIMEOUT = 80
 
 
 def _ocr_with_timeout(image_path: str) -> str:
@@ -122,6 +122,8 @@ def detect_and_route(doc):
 
 def process_pages(doc, page_indices, file_type, parser, master_candidates, master_parties):
     full_text = ""
+    ocr_timeout_occurred = False
+    timeout_details = []
 
     for page_idx in page_indices:
         page = doc.load_page(page_idx)
@@ -148,7 +150,9 @@ def process_pages(doc, page_indices, file_type, parser, master_candidates, maste
                     except FuturesTimeout:
                         print(f"⚠️ [Processor] OCR call timed out after {_OCR_CALL_TIMEOUT}s (attempt {attempt+1}/3)")
                         if attempt == 2:
-                            raise RuntimeError(f"OCR API timed out on all 3 attempts for chunk of page {page_idx}")
+                            ocr_timeout_occurred = True
+                            timeout_details.append(f"Chunk of page {page_idx}")
+                            print(f"⚠️ [Processor] Skipping this chunk due to timeout")
                     except Exception as e:
                         if _AirflowTaskTimeout and isinstance(e, _AirflowTaskTimeout):
                             raise  # task-level timeout — never retry
@@ -172,7 +176,9 @@ def process_pages(doc, page_indices, file_type, parser, master_candidates, maste
                 except FuturesTimeout:
                     print(f"⚠️ [Processor] OCR call timed out after {_OCR_CALL_TIMEOUT}s (attempt {attempt+1}/3)")
                     if attempt == 2:
-                        raise RuntimeError(f"OCR API timed out on all 3 attempts for page {page_idx}")
+                        ocr_timeout_occurred = True
+                        timeout_details.append(f"Page {page_idx}")
+                        print(f"⚠️ [Processor] Skipping page {page_idx} due to timeout")
                 except Exception as e:
                     if _AirflowTaskTimeout and isinstance(e, _AirflowTaskTimeout):
                         raise  # task-level timeout — never retry
@@ -187,5 +193,13 @@ def process_pages(doc, page_indices, file_type, parser, master_candidates, maste
     parsed_data = parser.parse_markdown(full_text)
     validator = ElectionValidator(master_candidates, master_parties)
     cleaned_data, flags_data = validator.validate(parsed_data)
+
+    # Add OCR timeout flag to the flags_data
+    if ocr_timeout_occurred:
+        flags_data["flag_ocr_timeout"] = True
+        flags_data["flag_ocr_timeout_detail"] = " | ".join(timeout_details)
+    else:
+        flags_data["flag_ocr_timeout"] = False
+        flags_data["flag_ocr_timeout_detail"] = "OK"
 
     return cleaned_data, flags_data
