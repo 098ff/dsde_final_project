@@ -154,3 +154,4 @@ build/
 .claude
 *test.csv
 *.csv
+*.json
