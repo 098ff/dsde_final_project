@@ -55,10 +55,11 @@ All flags appear as columns in `master_summary_log.csv`.
 | `flag_name_mismatch` | Candidate name not found in master list | Manual name mapping required |
 | `flag_missing_data` | Score or ballot field could not be parsed (`NaN`) | Verify OCR source image |
 | `flag_linguistic_mismatch` | OCR score cell has conflicting digit and Thai word | Re-read score cell manually |
+| `flag_ocr_timeout` | OCR API timed out after all retries for some pages/chunks | Review attached image / missing data |
 | `flag_missing_counterpart` | Station is missing its paired form type | Locate and re-scan missing form |
-| `needs_manual_check` | Any of the 5 per-unit flags above is `True` | Human-in-the-loop verification |
+| `needs_manual_check` | Any of the 6 per-unit flags above is `True` | Human-in-the-loop verification |
 
-> `needs_manual_check` covers the first 5 flags. `flag_missing_counterpart` is set separately during aggregation and does not affect `needs_manual_check`.
+> `needs_manual_check` covers the first 6 flags. `flag_missing_counterpart` is set separately during aggregation and does not affect `needs_manual_check`.
 
 ---
 
