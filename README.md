@@ -150,11 +150,10 @@ docker compose down
 
 ## Visualising Results
 
-Open the notebook to explore flags interactively:
+Run streamlit to view the manual review queue:
 
 ```bash
-cd election_pipeline/output_data
-jupyter notebook visualize_flags.ipynb
+streamlit run election_pipeline/validation/notebooks/streamlit_manual_review.py
 ```
 
 The notebook provides:
