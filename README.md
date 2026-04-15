@@ -27,33 +27,38 @@ Google Drive
 discover_units          ← finds all (tambon/unit) folders
     │
     ▼
-process_unit ×N         ← parallel OCR + ElectionValidator per unit (max 5 concurrent)
-    │           │
-    ▼           ▼
-aggregate_summaries   run_structural_audit
-(master_summary_log.csv)  (missing_units.csv)
+process_unit ×N         ← parallel OCR + ElectionValidator per unit
+    │                      max 5 concurrent (or 1 in RATE_LIMIT mode)
+    ▼
+aggregate_summaries     ← flattens logs, runs structural audit,
+(master_summary_log.csv)   stamps flag_missing_counterpart on every row
 ```
 
 ### Components
 
 | Directory | Role |
 |---|---|
-| `election_pipeline/` | Airflow DAG, OCR processor, Google Drive client, exporter |
-| `validation/` | Standalone validation modules (linguistic, structural, engine, formatters) |
+| `election_pipeline/dags/` | Airflow DAG definition |
+| `election_pipeline/src/` | OCR processor, Google Drive client, exporter, parser |
+| `election_pipeline/validation/` | Standalone validation modules (engine, linguistic, structural, formatters) |
 
 ---
 
 ## Validation Flags
 
+All flags appear as columns in `master_summary_log.csv`.
+
 | Flag | Meaning | Action if `True` |
 |---|---|---|
 | `flag_math_total_used` | Valid + Invalid + No Vote ≠ Total Used | Check top section of form |
 | `flag_math_valid_score` | Sum of candidate scores ≠ Total Valid Ballots | Check score table |
-| `flag_name_mismatch` | Extracted name similarity < 80% vs master list | Manual mapping required |
-| `flag_missing_data` | Score field could not be parsed (returns `NaN`) | Verify OCR source |
-| `needs_manual_check` | Any flag above is `True` | Human-in-the-loop verification |
+| `flag_name_mismatch` | Candidate name not found in master list | Manual name mapping required |
+| `flag_missing_data` | Score or ballot field could not be parsed (`NaN`) | Verify OCR source image |
+| `flag_linguistic_mismatch` | OCR score cell has conflicting digit and Thai word | Re-read score cell manually |
+| `flag_missing_counterpart` | Station is missing its paired form type | Locate and re-scan missing form |
+| `needs_manual_check` | Any of the 5 per-unit flags above is `True` | Human-in-the-loop verification |
 
-Missing forms per station are written to `output_data/missing_units.csv` by `run_structural_audit`.
+> `needs_manual_check` covers the first 5 flags. `flag_missing_counterpart` is set separately during aggregation and does not affect `needs_manual_check`.
 
 ---
 
@@ -78,7 +83,13 @@ Create `.env` in `election_pipeline/`:
 ```env
 TYPHOON_API_KEY=your_typhoon_api_key_here
 GDRIVE_ROOT_FOLDER_ID=your_google_drive_folder_id
+AIRFLOW_UID=1000
+RATE_LIMIT=false
 ```
+
+> Set `AIRFLOW_UID` to your host user ID (`id -u` on Linux/macOS). This prevents file permission conflicts between the container and your host filesystem.
+>
+> Set `RATE_LIMIT=true` to cap at 1 concurrent OCR request with a 3-second gap (20 req/min). Default `false` runs 5 concurrent tasks.
 
 Authorize Google Drive access (first time only):
 ```bash
@@ -119,10 +130,10 @@ Login: `admin` / `admin`
 | Output file | Location | Description |
 |---|---|---|
 | Per-unit CSVs | `output_data/{tambon}/{unit}/` | Parsed scores + validation flags per form |
-| `master_summary_log.csv` | `output_data/` | One row per processed form across all units |
-| `missing_units.csv` | `output_data/` | Stations missing Party List or Constituency form |
+| `master_summary_log.csv` | `output_data/` | One row per processed form — all flags included |
+| `visualize_flags.ipynb` | `output_data/` | Notebook for flag visualisation and human review queue |
 
-The `run_structural_audit` task runs automatically in parallel with `aggregate_summaries` — no manual step needed.
+> `missing_units.csv` is no longer produced. Missing counterpart forms are flagged inline via `flag_missing_counterpart` in `master_summary_log.csv`.
 
 ### 6. Stop Airflow
 
@@ -132,9 +143,29 @@ docker compose down
 
 ---
 
+## Visualising Results
+
+Open the notebook to explore flags interactively:
+
+```bash
+cd election_pipeline/output_data
+jupyter notebook visualize_flags.ipynb
+```
+
+The notebook provides:
+- Flag prevalence bar chart across all records
+- Flag load distribution (how many flags each record carries)
+- Per-tambon heatmap
+- Flag breakdown by form type
+- Colour-coded table of all records needing human verification
+- Drilldowns for each flag type
+- Summary table per tambon
+
+---
+
 ## Validation Module (standalone)
 
-The `validation/` package can also be used independently of Airflow:
+The `validation/` package can be used independently of Airflow:
 
 ```python
 from validation.engine import ElectionValidator
@@ -147,7 +178,7 @@ validator = ElectionValidator(master_candidates=MASTER_CANDIDATES, master_partie
 cleaned_data, flags = validator.validate(parsed_data)
 
 # Audit a batch for missing forms
-missing = audit_units(records)          # records = [{"Tambon": ..., "Unit": ..., "form_type": ...}]
+missing = audit_units(records)   # records = [{"Tambon": ..., "Unit": ..., "form_type": ...}]
 generate_missing_report(missing, "output_data/missing_units.csv")
 ```
 
