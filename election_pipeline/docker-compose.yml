@@ -11,6 +11,7 @@ x-airflow-common:
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: Asia/Bangkok
     PYTHONPATH: /opt/airflow
     # เพิ่ม Secret Key ตรงนี้เพื่อให้ทุก Service ใน Airflow ใช้ Key เดียวกัน
     AIRFLOW__WEBSERVER__SECRET_KEY: 'a_very_secure_random_string_for_airflow_webserver_12345'
