@@ -105,13 +105,13 @@ def election_ocr_pipeline():
         combined_doc = merge_pdfs(pdf_paths)
         print(f"{prefix} 📄 MERGE | Files={len(pdf_paths)} -> Pages={len(combined_doc)}")
 
-        routes = detect_and_route(combined_doc)
-
-        if routes is None:
-            print(f"{prefix} ⚠️ Skipping due to unexpected structure ({len(combined_doc)} pages)")
+        try:
+            routes = detect_and_route(combined_doc)
+        except ValueError as e:
+            print(f"{prefix} ⚠️ {str(e)}")
             combined_doc.close()
             shutil.rmtree(temp_dir, ignore_errors=True)
-            return unit_summary_logs
+            raise e
 
         for page_indices, file_type in routes:
             print(f"{prefix} 🚀 Start OCR | Pages={page_indices} | Type={file_type}")
