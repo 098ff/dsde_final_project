@@ -17,17 +17,22 @@ Usage::
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 import numpy as np
-import pandas as pd
-
 import re
+
+from thefuzz import fuzz
 
 from validation.linguistic_validator import clean_score_to_int, validate_score
 
 # Matches Thai consonants/vowels/tone marks (excludes Thai digits ๐-๙)
 _THAI_WORD_RE = re.compile(r"[\u0E01-\u0E3A\u0E40-\u0E4E]")
+
+# Minimum fuzzy-match ratio (0–100) for an OCR name to be mapped to a master
+# candidate.  Scores below this threshold are kept as-is and raise
+# flag_name_mismatch.
+_FUZZY_THRESHOLD = 80
 
 # ---------------------------------------------------------------------------
 # Type aliases
@@ -79,22 +84,26 @@ class ElectionValidator:
            that all sentinels (``None``, ``""``, ``"-"``, ``"—"``, ``"."``)
            become ``numpy.nan``.
 
-        2. **Master-list alignment** — any candidate or party in the master
-           lists that is absent from *raw_data* is added with score
-           ``numpy.nan``.  Candidates/parties present in *raw_data* but not in
-           the master lists are kept (not silently dropped) so no data is
-           lost.
+        2. **Fuzzy name alignment** — OCR-extracted candidate names are
+           fuzzy-matched against the master list (threshold: 80).  Names that
+           match are remapped to the canonical master name so downstream math
+           checks and exports use consistent identifiers.  Names below the
+           threshold are kept as-is and will raise ``flag_name_mismatch``.
 
-        3. **Math consistency** — checks that::
+        3. **Master-list gap-filling** — any master candidate not present
+           after alignment is inserted with score ``numpy.nan``.
+
+        4. **Math consistency** — checks that::
 
                valid_ballots + invalid_ballots + no_vote_ballots == ballots_used
 
            If any operand is ``np.nan`` the check is skipped (flag set to
            ``True`` with detail ``"(Missing Data)"``).
 
-        4. **Flag assembly** — produces a flags dict with:
+        5. **Flag assembly** — produces a flags dict with:
            ``flag_math_total_used``, ``flag_math_valid_score``,
-           ``flag_name_mismatch``, ``flag_missing_data``.
+           ``flag_name_mismatch``, ``flag_missing_data``,
+           ``flag_linguistic_mismatch``.
 
         Args:
             raw_data: Dict representing one polling station's OCR output.
@@ -120,12 +129,16 @@ class ElectionValidator:
             name: clean_score_to_int(val) for name, val in raw_scores.items()
         }
 
-        # Step 2: master-list alignment
-        # Support both string lists and dicts with a "name" key
+        # Step 2: fuzzy-align OCR names → master candidate names
         candidate_names = [
             c if isinstance(c, str) else c.get("name", str(c))
             for c in self._master_candidates
         ]
+        cleaned_scores, unrecognised_candidates = self._align_to_master(
+            cleaned_scores, candidate_names
+        )
+
+        # Step 3: fill any master candidates still absent after alignment
         for name in candidate_names:
             if name not in cleaned_scores:
                 cleaned_scores[name] = np.nan
@@ -140,7 +153,7 @@ class ElectionValidator:
 
         cleaned["scores"] = cleaned_scores
 
-        # Step 3: clean ballot summary fields
+        # Step 4: clean ballot summary fields
         ballot_fields = ("valid_ballots", "invalid_ballots", "no_vote_ballots", "ballots_used")
         for field in ballot_fields:
             if field in cleaned:
@@ -148,13 +161,66 @@ class ElectionValidator:
             else:
                 cleaned[field] = np.nan
 
-        # Step 4: assemble flags
-        flags = self._compute_flags(cleaned, raw_data)
+        # Step 5: assemble flags
+        flags = self._compute_flags(cleaned, raw_data, unrecognised_candidates)
         return cleaned, flags
 
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _align_to_master(
+        self,
+        scores: Dict[str, Any],
+        master_names: List[str],
+        threshold: int = _FUZZY_THRESHOLD,
+    ) -> Tuple[Dict[str, Any], Set[str]]:
+        """Fuzzy-map OCR-extracted candidate names to master list names.
+
+        For each extracted name the best-matching master name is found using
+        ``fuzz.ratio``.  If the ratio is at or above *threshold* the key is
+        remapped; otherwise the original name is kept and added to the
+        returned *unrecognised* set.
+
+        Args:
+            scores:       Dict of {ocr_name: cleaned_score}.
+            master_names: Authoritative candidate name list.
+            threshold:    Minimum ratio (0–100) to accept a match.
+
+        Returns:
+            ``(aligned_scores, unrecognised_names)``
+        """
+        aligned: Dict[str, Any] = {}
+        unrecognised: Set[str] = set()
+
+        for raw_name, score in scores.items():
+            if not raw_name:  # empty string from OCR noise
+                unrecognised.add(raw_name)
+                continue
+
+            best_master, best_ratio = None, 0
+            for master_name in master_names:
+                ratio = fuzz.ratio(raw_name, master_name)
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_master = master_name
+
+            if best_ratio >= threshold:
+                # Multiple OCR rows may map to the same master name — sum them
+                if best_master in aligned:
+                    existing = aligned[best_master]
+                    if not self._is_nan(existing) and not self._is_nan(score):
+                        aligned[best_master] = int(existing) + int(score)
+                    # if one is NaN keep the non-NaN value (or NaN if both are)
+                    elif self._is_nan(existing):
+                        aligned[best_master] = score
+                else:
+                    aligned[best_master] = score
+            else:
+                aligned[raw_name] = score
+                unrecognised.add(raw_name)
+
+        return aligned, unrecognised
 
     def _is_nan(self, value: Any) -> bool:
         """Return True if *value* is NaN or None."""
@@ -165,7 +231,12 @@ class ElectionValidator:
         except (TypeError, ValueError):
             return False
 
-    def _compute_flags(self, cleaned: Dict[str, Any], raw_data: RawData) -> Flags:
+    def _compute_flags(
+        self,
+        cleaned: Dict[str, Any],
+        raw_data: RawData,
+        unrecognised_candidates: Set[str],
+    ) -> Flags:
         """Compute validation flags from cleaned data."""
         flags: Flags = {}
 
@@ -215,28 +286,19 @@ class ElectionValidator:
                 f"{score_sum} != {expected_valid}" if mismatch else "OK"
             )
 
-        # --- flag_name_mismatch: candidate in raw_data not in master list ----
-        # Support both string lists and dicts with a "name" key
-        master_names = {
-            c if isinstance(c, str) else c.get("name", str(c))
-            for c in self._master_candidates
-        }
-        raw_names = set(raw_data.get("scores", {}).keys())
-        unrecognised = raw_names - master_names
-        flags["flag_name_mismatch"] = bool(unrecognised)
-        flags["flag_name_mismatch_detail"] = sorted(unrecognised) if unrecognised else []
+        # --- flag_name_mismatch: OCR names with no master match above threshold
+        flags["flag_name_mismatch"] = bool(unrecognised_candidates)
+        flags["flag_name_mismatch_detail"] = (
+            sorted(unrecognised_candidates) if unrecognised_candidates else []
+        )
 
         # --- flag_linguistic_mismatch: numeric digit vs Thai word cross-check -
-        # Some OCR outputs contain both a digit and a Thai word in the same
-        # score cell (e.g. "177 หนึ่งร้อยเจ็ดสิบเจ็ด"). When both parts are
-        # present, validate_score() compares them and raises the mismatch flag.
         mismatched_scores: list[str] = []
         for name, raw_val in raw_data.get("scores", {}).items():
             raw_str = str(raw_val) if raw_val is not None else ""
             if _THAI_WORD_RE.search(raw_str):
-                # Split numeric part (digits) from Thai word part (letters)
                 numeric_part = re.sub(r"[^\d๐-๙]", "", raw_str) or None
-                word_part = raw_str  # validate_score strips non-Thai internally
+                word_part = raw_str
                 result = validate_score(numeric_part, word_part)
                 if result["flag_linguistic_mismatch"]:
                     mismatched_scores.append(name)
