@@ -192,7 +192,7 @@ def process_pages(doc, page_indices, file_type, parser, master_candidates, maste
     # นำ Text ที่ได้ไปเข้ากระบวนการ Parser (สกัดตัวเลข) แล้ว Validate ด้วย ElectionValidator
     parsed_data = parser.parse_markdown(full_text)
     validator = ElectionValidator(master_candidates, master_parties)
-    cleaned_data, flags_data = validator.validate(parsed_data)
+    cleaned_data, flags_data = validator.validate(parsed_data, form_type=file_type)
 
     # Add OCR timeout flag to the flags_data
     if ocr_timeout_occurred:
