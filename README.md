@@ -1,95 +1,196 @@
-# 🗳️ Thai Election Document OCR Pipeline (Uthai Thani - District 2)
+# Thai Election Document OCR Pipeline (Uthai Thani - District 2)
 ### *Data Science & Data Engineering Project (2110446)*
 
-This repository implements an end-to-end data engineering pipeline designed to digitize and validate handwritten Thai election result forms (**ส.ส. 5/18**) from **Uthai Thani, Constituency District 2**. 
-
-The project focuses on transforming complex, handwritten physical records into structured, high-quality digital data using state-of-the-art Vision-Language Models (VLMs), orchestrated via **Apache Airflow**.
+End-to-end pipeline that digitizes and validates handwritten Thai election result forms (**ส.ส. 5/18**) from **Uthai Thani, Constituency District 2** using Vision-Language Models, orchestrated via Apache Airflow.
 
 ---
 
-## 📌 Project Overview & Challenges
-Extracting data from election forms in Uthai Thani District 2 presents several data engineering challenges:
-* **Handwritten Content:** Scores and counts are manually recorded by local officials, requiring robust OCR.
-* **Complex Structures:** Official forms contain intricate tables, stamps, and signatures that can confuse standard OCR.
-* **Regional Accuracy:** Extracted data must be strictly aligned with the specific candidate list of **Uthai Thani District 2**.
+## Project Overview
 
-### 🧪 Methodology & Experiments
-We experimented with two primary approaches to find the most resilient solution:
-1.  **Thai-TrOCR:** Initial testing with Transformer-based OCR specialized for Thai script.
-2.  **Typhoon Vision OCR (Selected):** A high-level pipeline using the **Typhoon (SCB 10X)** VLM for superior document understanding and structured extraction.
+Extracting data from election forms presents several challenges:
+- **Handwritten Content** — scores recorded by local officials require robust OCR
+- **Complex Structures** — tables, stamps, and signatures confuse standard OCR
+- **Regional Accuracy** — names must match the official candidate list for Uthai Thani District 2
 
----
-
-## ⚙️ Data Engineering Pipeline
-Our pipeline is built on the principles of **Resilience** and **Data Quality**:
-
-1.  **Image Pre-processing & Optimization:**
-    * **Grayscale Conversion:** Reduces payload size to improve API response time.
-    * **Smart Chunking:** For high-density "แบบแบ่งเขต" forms, the system splits images into segments to prevent **504 Gateway Timeouts** and enhance focus.
-2.  **Adaptive Routing:**
-    * *Constituency (แบ่งเขต):* Optimized for single-page extraction with image splitting.
-    * *Party List (บัญชีรายชื่อ):* Processes multi-page documents with high-ratio compression.
-3.  **Data Sanitization:** Automated mapping of Thai numerals (๑-๙) to Arabic (1-9) and removal of OCR noise.
-4.  **Parallel Processing:** Uses Airflow's Dynamic Task Mapping to process multiple election units simultaneously.
+We tested two OCR approaches:
+1. **Thai-TrOCR** — initial Transformer-based OCR for Thai script
+2. **Typhoon Vision OCR (selected)** — Typhoon (SCB 10X) VLM for superior document understanding
 
 ---
 
-## 🧪 Data Science & Validation
-To ensure data integrity (Data Quality Assurance), the pipeline implements several validation flags:
+## Architecture
 
-| Flag | Description | Action if `True` |
-| :--- | :--- | :--- |
-| `flag_math_total_used` | Sum of (Valid + Invalid + No Vote) $\neq$ Total Used | Check top section of the form |
-| `flag_math_valid_score` | Sum of candidate scores $\neq$ Total Valid Ballots | Check score table values |
-| `flag_name_mismatch` | Extracted name similarity < 80% vs. Master Data | Manual mapping required |
-| `needs_manual_check` | Triggered if any of the above are True | **Human-in-the-loop** verification |
+```
+Google Drive
+    │
+    ▼
+discover_units          ← finds all (tambon/unit) folders
+    │
+    ▼
+process_unit ×N         ← parallel OCR + ElectionValidator per unit
+    │                      max 5 concurrent (or 1 in RATE_LIMIT mode)
+    ▼
+aggregate_summaries     ← flattens logs, runs structural audit,
+(master_summary_log.csv)   stamps flag_missing_counterpart on every row
+```
 
-**Fuzzy Matching:** We utilize Levenshtein distance (via `thefuzz`) to automatically correct minor OCR misspellings in candidate and party names against the official master list.
+### Components
+
+| Directory | Role |
+|---|---|
+| `election_pipeline/dags/` | Airflow DAG definition |
+| `election_pipeline/src/` | OCR processor, Google Drive client, exporter, parser |
+| `election_pipeline/validation/` | Standalone validation modules (engine, linguistic, structural, formatters) |
 
 ---
 
-## 🚀 The Final Pipeline (`/election_pipeline`)
-The `/election_pipeline` directory contains the production-ready version of this project. It connects directly to Google Drive to fetch election forms, processes them using Typhoon API, and aggregates the results—all orchestrated automatically by **Docker** and **Apache Airflow**.
+## Validation Flags
 
-### 🛠️ Getting Started (Airflow Version)
+All flags appear as columns in `master_summary_log.csv`.
 
-**1. Clone the repository & Navigate:**
-   ```bash
-   git clone https://github.com/098ff/dsde_final_project.git
-   cd dsde_final_project/election_pipeline
+| Flag | Meaning | Action if `True` |
+|---|---|---|
+| `flag_math_total_used` | Valid + Invalid + No Vote ≠ Total Used | Check top section of form |
+| `flag_math_valid_score` | Sum of candidate scores ≠ Total Valid Ballots | Check score table |
+| `flag_name_mismatch` | Candidate name not found in master list | Manual name mapping required |
+| `flag_missing_data` | Score or ballot field could not be parsed (`NaN`) | Verify OCR source image |
+| `flag_linguistic_mismatch` | OCR score cell has conflicting digit and Thai word | Re-read score cell manually |
+| `flag_ocr_timeout` | OCR API timed out after all retries for some pages/chunks | Review attached image / missing data |
+| `flag_missing_counterpart` | Station is missing its paired form type | Locate and re-scan missing form |
+| `needs_manual_check` | Any of the 6 per-unit flags above is `True` | Human-in-the-loop verification |
+
+> `needs_manual_check` covers the first 6 flags. `flag_missing_counterpart` is set separately during aggregation and does not affect `needs_manual_check`.
+
+---
+
+## Running the Pipeline
+
+### Prerequisites
+
+- Docker Desktop installed and running
+- Typhoon API key
+- Google Drive credentials (OAuth)
+
+### 1. Clone and navigate
+
+```bash
+git clone https://github.com/098ff/dsde_final_project.git
+cd dsde_final_project/election_pipeline
+```
+
+### 2. Set up credentials
+
+Create `.env` in `election_pipeline/`:
+```env
+TYPHOON_API_KEY=your_typhoon_api_key_here
+GDRIVE_ROOT_FOLDER_ID=your_google_drive_folder_id
+AIRFLOW_UID=1000
+RATE_LIMIT=false
+```
+
+> Set `AIRFLOW_UID` to your host user ID (`id -u` on Linux/macOS). This prevents file permission conflicts between the container and your host filesystem.
+>
+> Set `RATE_LIMIT=true` to cap at 1 concurrent OCR request with a 3-second gap (20 req/min). Default `false` runs 5 concurrent tasks.
+
+Authorize Google Drive access (first time only):
+```bash
+python auth_setup.py
+```
+
+This opens a browser — click **อนุญาต (Allow)**. A `credentials/token.json` file will be created.
+
+### 3. Start Airflow
+
+```bash
+docker compose up -d
+```
+
+Wait ~30 seconds for the containers to initialize, then open **http://localhost:8080**
+
+Login: `admin` / `admin`
+
+### 4. Trigger `election_ocr_pipeline`
+
+1. Find `election_ocr_pipeline` in the DAG list and toggle it **ON**
+2. Click the **▶ Trigger DAG** button → **Trigger DAG w/ config**
+3. Set the parameters:
+   ```json
+   {
+     "amphoe": "อำเภอบ้านไร่",
+     "tambons": []
+   }
    ```
-
-**2. Setup Credentials:**
-   * Create a `.env` file in the root of the `election_pipeline` folder:
-     ```env
-     TYPHOON_API_KEY=your_typhoon_api_key_here
-     ```
-   * Place your Google Drive OAuth credential file (`client_secret.json` or `token.json`) inside the designated folder (e.g., `src/`).
-
-**3. Configure Target Google Drive Folder:**
-   * Open `src/config.py`.
-   * Update the `GDRIVE_ROOT_FOLDER_ID` to match the exact ID of your target folder on Google Drive (e.g., the folder for "อุทัยธานี_เขต2").
-     ```python
-     GDRIVE_ROOT_FOLDER_ID = 'your_google_drive_folder_id'
-     ```
-
-**4. Start the Airflow Environment:**
-   Make sure you have Docker Desktop running, then start the containers:
-   ```bash
-   docker compose up -d
+   Leave `tambons` empty to process all sub-districts, or specify names to filter:
+   ```json
+   { "amphoe": "อำเภอบ้านไร่", "tambons": ["ตำบลบ้านไร่", "ตำบลคอกควาย"] }
    ```
+4. Click **Trigger**
 
-**5. Trigger the Pipeline:**
-   * Open your browser and go to **`http://localhost:8080`**.
-   * Login to Airflow (Default credentials: `admin` / `admin`).
-   * Turn the toggle **ON** for the `election_ocr_pipeline` DAG.
-   * Click the **Play** button (▶️) and select **"Trigger DAG w/ config"**.
-   * Verify the parameters (e.g., `"amphoe": "อำเภอบ้านไร่"`) and click **Trigger**.
+### 5. What the DAG produces
 
-*(Note: If you only want to run standard tests without the Airflow orchestrator, you can still open and run the cells in `pipeline.ipynb`.)*
+| Output file | Location | Description |
+|---|---|---|
+| Per-unit CSVs | `output_data/{tambon}/{unit}/` | Parsed scores + validation flags per form |
+| `master_summary_log.csv` | `output_data/` | One row per processed form — all flags included |
+| `visualize_flags.ipynb` | `output_data/` | Notebook for flag visualisation and human review queue |
+
+> `missing_units.csv` is no longer produced. Missing counterpart forms are flagged inline via `flag_missing_counterpart` in `master_summary_log.csv`.
+
+### 6. Stop Airflow
+
+```bash
+docker compose down
+```
 
 ---
 
-## 👨‍💻 Contributors
-* **Chanatda Konchom** (6631305321)
-* Course: 2110446 Data Science and Data Engineering, Chulalongkorn University.
+## Visualising Results
+
+Open the notebook to explore flags interactively:
+
+```bash
+cd election_pipeline/output_data
+jupyter notebook visualize_flags.ipynb
+```
+
+The notebook provides:
+- Flag prevalence bar chart across all records
+- Flag load distribution (how many flags each record carries)
+- Per-tambon heatmap
+- Flag breakdown by form type
+- Colour-coded table of all records needing human verification
+- Drilldowns for each flag type
+- Summary table per tambon
+
+---
+
+## Validation Module (standalone)
+
+The `validation/` package can be used independently of Airflow:
+
+```python
+from validation.engine import ElectionValidator
+from validation.structural_auditor import audit_units, generate_missing_report
+from validation.linguistic_validator import clean_score_to_int, thai_word_to_int
+from validation.formatters import prepare_df_for_csv
+
+# Validate a single parsed record
+validator = ElectionValidator(master_candidates=MASTER_CANDIDATES, master_parties=MASTER_PARTIES)
+cleaned_data, flags = validator.validate(parsed_data)
+
+# Audit a batch for missing forms
+missing = audit_units(records)   # records = [{"Tambon": ..., "Unit": ..., "form_type": ...}]
+generate_missing_report(missing, "output_data/missing_units.csv")
+```
+
+Run tests:
+```bash
+cd election_pipeline && uv run pytest validation/tests/
+```
+
+---
+
+## Contributors
+
+- **Chanatda Konchom** (6631305321)
+- Course: 2110446 Data Science and Data Engineering, Chulalongkorn University

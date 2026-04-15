@@ -5,7 +5,39 @@ import time
 import cv2
 import numpy as np
 from PIL import Image
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from typhoon_ocr import ocr_document
+
+from validation.engine import ElectionValidator
+
+try:
+    from airflow.exceptions import AirflowTaskTimeout as _AirflowTaskTimeout
+except ImportError:
+    _AirflowTaskTimeout = None  # running outside Airflow (tests, scripts)
+
+# Hard cap per individual OCR API call — prevents the OpenAI client from blocking
+# indefinitely when the server accepts the connection but never returns a response.
+# 3 retries × 80s = 240s max per image chunk, well within the 300s task timeout.
+_OCR_CALL_TIMEOUT = 80
+
+
+def _ocr_with_timeout(image_path: str) -> str:
+    """Call ocr_document() with a hard per-call timeout via a thread pool.
+
+    IMPORTANT: does NOT use the ``with`` context manager for ThreadPoolExecutor
+    because ``__exit__`` calls ``shutdown(wait=True)``, which would block until
+    the hung thread finishes and neutralise the timeout entirely.  Instead we
+    call ``shutdown(wait=False)`` to abandon the thread on timeout.
+    """
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(ocr_document, pdf_or_image_path=image_path)
+    try:
+        result = future.result(timeout=_OCR_CALL_TIMEOUT)
+        pool.shutdown(wait=False)
+        return result
+    except FuturesTimeout:
+        pool.shutdown(wait=False)  # abandon the hung thread; do not block
+        raise
 
 
 # table detection
@@ -88,8 +120,10 @@ def detect_and_route(doc):
     return routes
 
 
-def process_pages(doc, page_indices, file_type, parser, master_list):
+def process_pages(doc, page_indices, file_type, parser, master_candidates, master_parties):
     full_text = ""
+    ocr_timeout_occurred = False
+    timeout_details = []
 
     for page_idx in page_indices:
         page = doc.load_page(page_idx)
@@ -104,33 +138,68 @@ def process_pages(doc, page_indices, file_type, parser, master_list):
             for chunk in chunks:
                 with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
                     chunk.convert('L').save(tmp.name, "JPEG", quality=75)
+                    tmp_path = tmp.name
 
-                    # Retry Logic 3 ครั้งต่อ 1 ท่อน
-                    for attempt in range(3):
-                        try:
-                            extracted_text = ocr_document(pdf_or_image_path=tmp.name)
-                            full_text += "\n" + extracted_text
-                            break
-                        except Exception as e:
-                            print(f"⚠️ [Processor] Timeout attempt {attempt+1}: {e}")
-                            time.sleep(3)
+                # Retry up to 3 times — only on API/timeout errors.
+                # AirflowTaskTimeout must propagate immediately (no retry).
+                for attempt in range(3):
+                    try:
+                        extracted_text = _ocr_with_timeout(tmp_path)
+                        full_text += "\n" + extracted_text
+                        break
+                    except FuturesTimeout:
+                        print(f"⚠️ [Processor] OCR call timed out after {_OCR_CALL_TIMEOUT}s (attempt {attempt+1}/3)")
+                        if attempt == 2:
+                            ocr_timeout_occurred = True
+                            timeout_details.append(f"Chunk of page {page_idx}")
+                            print(f"⚠️ [Processor] Skipping this chunk due to timeout")
+                    except Exception as e:
+                        if _AirflowTaskTimeout and isinstance(e, _AirflowTaskTimeout):
+                            raise  # task-level timeout — never retry
+                        print(f"⚠️ [Processor] OCR error attempt {attempt+1}: {e}")
+                        if attempt == 2:
+                            raise
+                        time.sleep(3)
 
-                    os.remove(tmp.name)
+                os.remove(tmp_path)
         else:
             # 📄 บัญชีรายชื่อ: ส่งทั้งหน้า (ย่อเป็นขาวดำ)
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
                 img.convert('L').save(tmp.name, "JPEG", quality=75)
-                for attempt in range(3):
-                    try:
-                        extracted_text = ocr_document(pdf_or_image_path=tmp.name)
-                        full_text += "\n" + extracted_text
-                        break
-                    except Exception as e:
-                        time.sleep(3)
-                os.remove(tmp.name)
+                tmp_path = tmp.name
 
-    # นำ Text ที่ได้ไปเข้ากระบวนการ Parser (สกัดตัวเลขและเช็คความถูกต้อง)
+            for attempt in range(3):
+                try:
+                    extracted_text = _ocr_with_timeout(tmp_path)
+                    full_text += "\n" + extracted_text
+                    break
+                except FuturesTimeout:
+                    print(f"⚠️ [Processor] OCR call timed out after {_OCR_CALL_TIMEOUT}s (attempt {attempt+1}/3)")
+                    if attempt == 2:
+                        ocr_timeout_occurred = True
+                        timeout_details.append(f"Page {page_idx}")
+                        print(f"⚠️ [Processor] Skipping page {page_idx} due to timeout")
+                except Exception as e:
+                    if _AirflowTaskTimeout and isinstance(e, _AirflowTaskTimeout):
+                        raise  # task-level timeout — never retry
+                    print(f"⚠️ [Processor] OCR error attempt {attempt+1}: {e}")
+                    if attempt == 2:
+                        raise
+                    time.sleep(3)
+
+            os.remove(tmp_path)
+
+    # นำ Text ที่ได้ไปเข้ากระบวนการ Parser (สกัดตัวเลข) แล้ว Validate ด้วย ElectionValidator
     parsed_data = parser.parse_markdown(full_text)
-    flags_data = parser.validate_data(parsed_data, file_type, master_list=master_list)
+    validator = ElectionValidator(master_candidates, master_parties)
+    cleaned_data, flags_data = validator.validate(parsed_data)
 
-    return parsed_data, flags_data
+    # Add OCR timeout flag to the flags_data
+    if ocr_timeout_occurred:
+        flags_data["flag_ocr_timeout"] = True
+        flags_data["flag_ocr_timeout_detail"] = " | ".join(timeout_details)
+    else:
+        flags_data["flag_ocr_timeout"] = False
+        flags_data["flag_ocr_timeout_detail"] = "OK"
+
+    return cleaned_data, flags_data
