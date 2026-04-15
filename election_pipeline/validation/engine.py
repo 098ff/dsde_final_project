@@ -69,7 +69,7 @@ class ElectionValidator:
     # Public API
     # ------------------------------------------------------------------
 
-    def validate(self, raw_data: RawData) -> Tuple[Dict[str, Any], Flags]:
+    def validate(self, raw_data: RawData, form_type: str = None) -> Tuple[Dict[str, Any], Flags]:
         """Validate *raw_data* and return cleaned data together with flags.
 
         The validation pipeline:
@@ -121,24 +121,22 @@ class ElectionValidator:
         }
 
         # Step 2: master-list alignment
-        # Support both string lists and dicts with a "name" key
-        candidate_names = [
-            c if isinstance(c, str) else c.get("name", str(c))
-            for c in self._master_candidates
-        ]
-        for name in candidate_names:
-            if name not in cleaned_scores:
-                cleaned_scores[name] = np.nan
+        if form_type == "บัญชีรายชื่อ":
+            master_names_list = self._master_parties
+        else:
+            master_names_list = [
+                c if isinstance(c, str) else c.get("name", str(c))
+                for c in self._master_candidates
+            ]
 
-        party_scores: Dict[str, Any] = dict(cleaned.get("party_scores", {}))
-        for party in self._master_parties:
-            if party not in party_scores:
-                party_scores[party] = np.nan
-            else:
-                party_scores[party] = clean_score_to_int(party_scores[party])
-        cleaned["party_scores"] = party_scores
+        final_scores = {}
+        for name in master_names_list:
+            final_scores[name] = cleaned_scores.get(name, np.nan)
 
-        cleaned["scores"] = cleaned_scores
+        cleaned["scores"] = final_scores
+
+        if "party_scores" in cleaned:
+            del cleaned["party_scores"]
 
         # Step 3: clean ballot summary fields
         ballot_fields = ("valid_ballots", "invalid_ballots", "no_vote_ballots", "ballots_used")
@@ -149,7 +147,7 @@ class ElectionValidator:
                 cleaned[field] = np.nan
 
         # Step 4: assemble flags
-        flags = self._compute_flags(cleaned, raw_data)
+        flags = self._compute_flags(cleaned, raw_data, form_type)
         return cleaned, flags
 
     # ------------------------------------------------------------------
@@ -165,15 +163,13 @@ class ElectionValidator:
         except (TypeError, ValueError):
             return False
 
-    def _compute_flags(self, cleaned: Dict[str, Any], raw_data: RawData) -> Flags:
+    def _compute_flags(self, cleaned: Dict[str, Any], raw_data: RawData, form_type: str = None) -> Flags:
         """Compute validation flags from cleaned data."""
         flags: Flags = {}
 
         # --- flag_missing_data: any score in cleaned['scores'] is NaN -------
         any_score_nan = any(
             self._is_nan(v) for v in cleaned.get("scores", {}).values()
-        ) or any(
-            self._is_nan(v) for v in cleaned.get("party_scores", {}).values()
         )
         ballot_fields = ("valid_ballots", "invalid_ballots", "no_vote_ballots", "ballots_used")
         any_ballot_nan = any(self._is_nan(cleaned.get(f)) for f in ballot_fields)
@@ -216,11 +212,13 @@ class ElectionValidator:
             )
 
         # --- flag_name_mismatch: candidate in raw_data not in master list ----
-        # Support both string lists and dicts with a "name" key
-        master_names = {
-            c if isinstance(c, str) else c.get("name", str(c))
-            for c in self._master_candidates
-        }
+        if form_type == "บัญชีรายชื่อ":
+            master_names = set(self._master_parties)
+        else:
+            master_names = {
+                c if isinstance(c, str) else c.get("name", str(c))
+                for c in self._master_candidates
+            }
         raw_names = set(raw_data.get("scores", {}).keys())
         unrecognised = raw_names - master_names
         flags["flag_name_mismatch"] = bool(unrecognised)
