@@ -13,6 +13,7 @@ dependencies = [
     "pillow>=12.2.0",
     "pymupdf>=1.27.2.2",
     "python-dotenv>=1.2.2",
+    "streamlit>=1.56.0",
     "thefuzz>=0.22.1",
     "typhoon-ocr>=0.4.1",
 ]
