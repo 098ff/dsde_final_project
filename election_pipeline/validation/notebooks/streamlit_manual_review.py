@@ -101,6 +101,13 @@ if df_full.empty:
 # ---------------------------------------------------------------------------
 
 st.sidebar.header("Filters")
+all_amphoes: list[str] = sorted(df_full["amphoe"].dropna().unique().tolist())
+selected_amphoes: list[str] = st.sidebar.multiselect(
+    "Amphoe (อำเภอ)",
+    options=all_amphoes,
+    default=all_amphoes,
+    help="Filter by district",
+)
 
 all_tambons: list[str] = sorted(df_full["tambon"].dropna().unique().tolist())
 selected_tambons: list[str] = st.sidebar.multiselect(
@@ -133,6 +140,9 @@ selected_flag_cols: list[str] = st.sidebar.multiselect(
 
 df = df_full.copy()
 
+if selected_amphoes:
+    df = df[df["amphoe"].isin(selected_amphoes)]
+
 if selected_tambons:
     df = df[df["tambon"].isin(selected_tambons)]
 
@@ -143,8 +153,89 @@ if selected_flag_cols:
     mask = df[selected_flag_cols].all(axis=1)
     df = df[mask]
 
+
 # ---------------------------------------------------------------------------
-# Section 1 — Hierarchical review queue
+# Section 1 — Flag summary
+# ---------------------------------------------------------------------------
+
+st.header("Flag Summary")
+st.caption(
+    f"Counts for **{len(df)}** filtered records"
+    + (f" (full dataset: {len(df_full)})" if len(df) != len(df_full) else "")
+    + "."
+)
+
+# Per-flag counts from the filtered dataframe
+flag_counts = {col: int(df[col].sum()) for col in FLAG_COLS}
+flag_summary_df = pd.DataFrame(
+    {
+        "flag": list(flag_counts.keys()),
+        "label": [_pretty_flag(c) for c in flag_counts.keys()],
+        "count": list(flag_counts.values()),
+    }
+).sort_values("count", ascending=True)
+
+if HAS_PLOTLY:
+    fig = px.bar(
+        flag_summary_df,
+        x="count",
+        y="label",
+        orientation="h",
+        title="Records per Flag (filtered)",
+        labels={"count": "Record count", "label": "Flag"},
+        color="count",
+        color_continuous_scale="Blues",
+        text="count",
+    )
+    fig.update_traces(textposition="outside")
+    fig.update_layout(
+        showlegend=False,
+        coloraxis_showscale=False,
+        height=350,
+        margin=dict(l=20, r=40, t=40, b=20),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+elif HAS_ALTAIR:
+    chart = (
+        alt.Chart(flag_summary_df)
+        .mark_bar()
+        .encode(
+            x=alt.X("count:Q", title="Record count"),
+            y=alt.Y("label:N", sort="-x", title="Flag"),
+            color=alt.Color("count:Q", scale=alt.Scale(scheme="blues"), legend=None),
+            tooltip=["label:N", "count:Q"],
+        )
+        .properties(title="Records per Flag (filtered)", height=300)
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+else:
+    st.warning("Neither plotly nor altair is installed — showing raw table instead.")
+    st.dataframe(flag_summary_df[["label", "count"]].rename(columns={"label": "Flag", "count": "Count"}))
+
+# Per-flag expandable detail sections (use filtered df so user can drill down)
+st.subheader("Per-flag detail")
+
+for col in FLAG_COLS:
+    affected = df[df[col] == True]  # noqa: E712
+    full_affected_count = int(df_full[col].sum())
+    label = _pretty_flag(col)
+    suffix = f" / {full_affected_count} total" if len(affected) != full_affected_count else ""
+
+    with st.expander(f"{label} — {len(affected)} records{suffix}"):
+        if affected.empty:
+            st.write("No matching records under current filters.")
+        else:
+            detail_cols = ["tambon", "unit", "type", "details"]
+            st.dataframe(
+                affected[detail_cols].reset_index(drop=True),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+# ---------------------------------------------------------------------------
+# Section 2 — Hierarchical review queue
 # ---------------------------------------------------------------------------
 
 st.header("Manual Review Queue")
@@ -188,78 +279,3 @@ else:
             )
 
         st.divider()
-
-# ---------------------------------------------------------------------------
-# Section 2 — Flag summary
-# ---------------------------------------------------------------------------
-
-st.header("Flag Summary")
-st.caption("Counts computed from the **full** dataset (all 242 records, ignoring filters above).")
-
-# Per-flag counts from the unfiltered dataframe
-flag_counts = {col: int(df_full[col].sum()) for col in FLAG_COLS}
-flag_summary_df = pd.DataFrame(
-    {
-        "flag": list(flag_counts.keys()),
-        "label": [_pretty_flag(c) for c in flag_counts.keys()],
-        "count": list(flag_counts.values()),
-    }
-).sort_values("count", ascending=True)
-
-if HAS_PLOTLY:
-    fig = px.bar(
-        flag_summary_df,
-        x="count",
-        y="label",
-        orientation="h",
-        title="Records per Flag (full dataset)",
-        labels={"count": "Record count", "label": "Flag"},
-        color="count",
-        color_continuous_scale="Blues",
-        text="count",
-    )
-    fig.update_traces(textposition="outside")
-    fig.update_layout(
-        showlegend=False,
-        coloraxis_showscale=False,
-        height=350,
-        margin=dict(l=20, r=40, t=40, b=20),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-elif HAS_ALTAIR:
-    chart = (
-        alt.Chart(flag_summary_df)
-        .mark_bar()
-        .encode(
-            x=alt.X("count:Q", title="Record count"),
-            y=alt.Y("label:N", sort="-x", title="Flag"),
-            color=alt.Color("count:Q", scale=alt.Scale(scheme="blues"), legend=None),
-            tooltip=["label:N", "count:Q"],
-        )
-        .properties(title="Records per Flag (full dataset)", height=300)
-    )
-    st.altair_chart(chart, use_container_width=True)
-
-else:
-    st.warning("Neither plotly nor altair is installed — showing raw table instead.")
-    st.dataframe(flag_summary_df[["label", "count"]].rename(columns={"label": "Flag", "count": "Count"}))
-
-# Per-flag expandable detail sections (use filtered df so user can drill down)
-st.subheader("Per-flag detail")
-
-for col in FLAG_COLS:
-    affected = df[df[col] == True]  # noqa: E712
-    full_affected_count = int(df_full[col].sum())
-    label = _pretty_flag(col)
-
-    with st.expander(f"{label} — {full_affected_count} records (full) | {len(affected)} visible"):
-        if affected.empty:
-            st.write("No matching records under current filters.")
-        else:
-            detail_cols = ["tambon", "unit", "type", "details"]
-            st.dataframe(
-                affected[detail_cols].reset_index(drop=True),
-                use_container_width=True,
-                hide_index=True,
-            )

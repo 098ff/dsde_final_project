@@ -59,7 +59,11 @@ All flags appear as columns in `master_summary_log.csv`.
 | `flag_missing_counterpart` | Station is missing its paired form type | Locate and re-scan missing form |
 | `needs_manual_check` | Any of the 6 per-unit flags above is `True` | Human-in-the-loop verification |
 
-> `needs_manual_check` covers the first 6 flags. `flag_missing_counterpart` is set separately during aggregation and does not affect `needs_manual_check`.
+> **`flag_missing_data` vs `flag_missing_counterpart`** — these are not the same:
+> - `flag_missing_data` — the form **exists** but a score or ballot field could not be read (OCR returned NaN). Action: verify the numbers on the physical form.
+> - `flag_missing_counterpart` — an entire form type for a station is **absent** (e.g. station has บัญชีรายชื่อ but no แบ่งเขต). Action: locate and re-scan the missing form.
+>
+> `needs_manual_check` covers the first 6 per-unit flags. `flag_missing_counterpart` is set separately during aggregation and does **not** affect `needs_manual_check`.
 
 ---
 
