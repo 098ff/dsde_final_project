@@ -85,8 +85,7 @@ def detect_and_route(doc):
     valid_counts = {2, 4, 6}
 
     if total_pages not in valid_counts:
-        print(f"⚠️ [Processor] Invalid page count ({total_pages} pages). Expected 2, 4, or 6.")
-        return None
+        raise ValueError(f"⚠️ [Processor] Invalid page count ({total_pages} pages). Expected 2, 4, or 6.")
 
     page1_has_table = has_table(doc.load_page(0))
     page2_has_table = has_table(doc.load_page(1)) if total_pages >= 2 else False
@@ -95,8 +94,7 @@ def detect_and_route(doc):
 
     if total_pages == 2:
         if page1_has_table and page2_has_table: 
-            print("⚠️ [Processor] Anomaly: 2 pages detected but both have tables. Skipping.")
-            return None
+            raise ValueError("⚠️ [Processor] Anomaly: 2 pages detected but both have tables. Cannot determine route.")
         else:
             routes.append(([0], "แบ่งเขต"))
 
@@ -104,8 +102,7 @@ def detect_and_route(doc):
         if page1_has_table and page2_has_table: 
             routes.append(([0, 1, 2], "บัญชีรายชื่อ"))
         else:
-            print("⚠️ [Processor] Anomaly: 4 pages detected but missing expected table pattern. Skipping.")
-            return None
+            raise ValueError("⚠️ [Processor] Anomaly: 4 pages detected but missing expected table pattern. Cannot determine route.")
 
     elif total_pages == 6:
         if page1_has_table and page2_has_table:
