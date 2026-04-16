@@ -60,6 +60,21 @@ def election_ocr_pipeline():
         actual_amphoe_name = amphoe_folders[0]['name']
         print(f"📂 Found Target Folder: {actual_amphoe_name}")
 
+        units_to_process = []
+
+        # ----------------------------------------------------
+        # SPECIAL CASE CHECK (ข้ามการหา Tambon และ Unit)
+        # ----------------------------------------------------
+        if actual_amphoe_name in ["ล่วงหน้าในเขต", "ล่วงหน้านอกเขตและนอกราชอาณาจักร"]:
+            units_to_process.append({
+                "amphoe": actual_amphoe_name,
+                "tambon": "",
+                "unit": "",
+                "folder_id": amphoe_id,
+                "special_type": actual_amphoe_name
+            })
+            return units_to_process
+
         # 2. หาโฟลเดอร์ตำบล (หรือโฟลเดอร์ระดับกลาง)
         tambon_folders = list_folders_in_folder(service, amphoe_id)
         if target_tambons:
@@ -102,75 +117,111 @@ def election_ocr_pipeline():
             shutil.rmtree(temp_dir, ignore_errors=True)
             return unit_summary_logs
 
-        combined_doc = merge_pdfs(pdf_paths)
-        print(f"{prefix} 📄 MERGE | Files={len(pdf_paths)} -> Pages={len(combined_doc)}")
+        special_type = unit_info.get("special_type")
 
-        try:
-            routes = detect_and_route(combined_doc)
-        except ValueError as e:
-            print(f"{prefix} ⚠️ {str(e)}")
-            combined_doc.close()
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            raise e
+        # ฟังก์ชันย่อยสำหรับจัดการแต่ละ Route (ลด code ซ้ำ)
+        def _process_and_export_routes(routes, doc_obj, chunk_suffix=""):
+            for page_indices, file_type in routes:
+                print(f"{prefix} 🚀 Start OCR | Pages={page_indices} | Type={file_type}")
+                try:
+                    parsed_data, flags_data = process_pages(
+                        doc_obj, page_indices, file_type, parser,
+                        master_candidates=MASTER_CANDIDATES,
+                        master_parties=MASTER_PARTIES,
+                    )
+                except Exception as e:
+                    print(f"{prefix} ❌ OCR FAILED | Pages={page_indices} | Type={file_type} | Error={str(e)}")
+                    raise
 
-        for page_indices, file_type in routes:
-            print(f"{prefix} 🚀 Start OCR | Pages={page_indices} | Type={file_type}")
-            try:
-                parsed_data, flags_data = process_pages(
-                    combined_doc, page_indices, file_type, parser,
-                    master_candidates=MASTER_CANDIDATES,
-                    master_parties=MASTER_PARTIES,
-                )
-            except Exception as e:
-                print(f"{prefix} ❌ OCR FAILED | Pages={page_indices} | Type={file_type} | Error={str(e)}")
-                raise
+                output_name = f"summary_{file_type}{chunk_suffix}"
 
-            output_name = f"summary_{file_type}"
+                full_record = {
+                    "metadata": {
+                        "amphoe": unit_info['amphoe'],
+                        "tambon": unit_info['tambon'],
+                        "unit": unit_info['unit'],
+                        "file": output_name
+                    },
+                    **parsed_data,
+                    **flags_data
+                }
+                export_individual_result(full_record, unit_info['amphoe'], unit_info['tambon'], unit_info['unit'], output_name)
 
-            full_record = {
-                "metadata": {
+                needs_manual_check = any([
+                    flags_data.get("flag_math_total_used", False),
+                    flags_data.get("flag_math_valid_score", False),
+                    flags_data.get("flag_name_mismatch", False),
+                    flags_data.get("flag_missing_data", False),
+                    flags_data.get("flag_linguistic_mismatch", False),
+                    flags_data.get("flag_ocr_timeout", False),
+                ])
+                detail_parts = [
+                    flags_data.get("flag_math_total_used_detail", ""),
+                    flags_data.get("flag_math_valid_score_detail", ""),
+                    flags_data.get("flag_ocr_timeout_detail", ""),
+                ]
+                details = " | ".join(p for p in detail_parts if p and p != "OK") or "OK"
+
+                unit_summary_logs.append({
                     "amphoe": unit_info['amphoe'],
                     "tambon": unit_info['tambon'],
                     "unit": unit_info['unit'],
-                    "file": output_name
-                },
-                **parsed_data,
-                **flags_data
-            }
-            export_individual_result(full_record, unit_info['tambon'], unit_info['unit'], output_name)
+                    "type": file_type,
+                    "file": output_name,
+                    "needs_manual_check": needs_manual_check,
+                    "flag_math_total_used": flags_data.get("flag_math_total_used", False),
+                    "flag_math_valid_score": flags_data.get("flag_math_valid_score", False),
+                    "flag_name_mismatch": flags_data.get("flag_name_mismatch", False),
+                    "flag_missing_data": flags_data.get("flag_missing_data", False),
+                    "flag_linguistic_mismatch": flags_data.get("flag_linguistic_mismatch", False),
+                    "flag_ocr_timeout": flags_data.get("flag_ocr_timeout", False),
+                    "details": details,
+                })
 
-            needs_manual_check = any([
-                flags_data.get("flag_math_total_used", False),
-                flags_data.get("flag_math_valid_score", False),
-                flags_data.get("flag_name_mismatch", False),
-                flags_data.get("flag_missing_data", False),
-                flags_data.get("flag_linguistic_mismatch", False),
-                flags_data.get("flag_ocr_timeout", False),
-            ])
-            detail_parts = [
-                flags_data.get("flag_math_total_used_detail", ""),
-                flags_data.get("flag_math_valid_score_detail", ""),
-                flags_data.get("flag_ocr_timeout_detail", ""),
-            ]
-            details = " | ".join(p for p in detail_parts if p and p != "OK") or "OK"
+        if special_type == "ล่วงหน้านอกเขตและนอกราชอาณาจักร":
+            import fitz
+            # Processing each PDF separately, chunking into 2-page sub-documents
+            for pdf_path in pdf_paths:
+                base_pdf_name = os.path.basename(pdf_path)
+                print(f"{prefix} 📄 SPLIT | File: {base_pdf_name}")
+                doc = fitz.open(pdf_path)
+                num_pages = len(doc)
 
-            unit_summary_logs.append({
-                "amphoe": unit_info['amphoe'],
-                "tambon": unit_info['tambon'],
-                "unit": unit_info['unit'],
-                "type": file_type,
-                "file": output_name,
-                "needs_manual_check": needs_manual_check,
-                "flag_math_total_used": flags_data.get("flag_math_total_used", False),
-                "flag_math_valid_score": flags_data.get("flag_math_valid_score", False),
-                "flag_name_mismatch": flags_data.get("flag_name_mismatch", False),
-                "flag_missing_data": flags_data.get("flag_missing_data", False),
-                "flag_linguistic_mismatch": flags_data.get("flag_linguistic_mismatch", False),
-                "flag_ocr_timeout": flags_data.get("flag_ocr_timeout", False),
-                "details": details,
-            })
+                for chunk_idx, start_page in enumerate(range(0, num_pages, 2)):
+                    end_page = min(start_page + 1, num_pages - 1)
+                    sub_doc = fitz.open()
+                    sub_doc.insert_pdf(doc, from_page=start_page, to_page=end_page)
+                    
+                    try:
+                        routes = detect_and_route(sub_doc)
+                    except ValueError as e:
+                        print(f"{prefix} ⚠️ Chunk {chunk_idx+1} ({start_page} to {end_page}): {str(e)}")
+                        sub_doc.close()
+                        continue
 
-        combined_doc.close()
+                    chunk_suffix = f"-{chunk_idx + 1}"
+                    _process_and_export_routes(routes, sub_doc, chunk_suffix)
+                    
+                    sub_doc.close()
+                doc.close()
+
+        else:
+            # NORMAL CASE or "ล่วงหน้าในเขต" (merge all)
+            combined_doc = merge_pdfs(pdf_paths)
+            print(f"{prefix} 📄 MERGE | Files={len(pdf_paths)} -> Pages={len(combined_doc)}")
+
+            try:
+                routes = detect_and_route(combined_doc)
+            except ValueError as e:
+                print(f"{prefix} ⚠️ {str(e)}")
+                combined_doc.close()
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                raise e
+
+            _process_and_export_routes(routes, combined_doc)
+            
+            combined_doc.close()
+
         shutil.rmtree(temp_dir, ignore_errors=True)
         return unit_summary_logs
 
@@ -194,7 +245,7 @@ def election_ocr_pipeline():
                 "Unit":   log["unit"],
                 "form_type": _TYPE_MAP.get(log["type"], "Unknown"),
             }
-            for log in flat_logs
+            for log in flat_logs if log["tambon"] or log["unit"] # Skip audit for special cases
         ]
         missing_items = audit_units(records)
 
