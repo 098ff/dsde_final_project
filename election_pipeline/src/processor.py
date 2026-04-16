@@ -127,37 +127,64 @@ def process_pages(doc, page_indices, file_type, parser, master_candidates, maste
         pix = page.get_pixmap(dpi=150)
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-        # 📐 ปรับขนาดภาพถ้าใหญ่เกินไปเพื่อป้องกัน Timeout โดยไม่ทำให้โครงสร้างพัง (ไม่ตัดครึ่ง)
-        w, h = img.size
-        # กำหนดขนาดสูงสุดที่ 2000 pixel
-        if max(w, h) > 2000:
-            ratio = 2000 / max(w, h)
-            img = img.resize((int(w * ratio), int(h * ratio)), Image.Resampling.LANCZOS)
+        if file_type == "แบ่งเขต":
+            # ✂️ ตัดรูปครึ่งบน-ครึ่งล่าง ป้องกัน Timeout
+            w, h = img.size
+            chunks = [img.crop((0, 0, w, h//2)), img.crop((0, h//2, w, h))]
 
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-            img.convert('L').save(tmp.name, "JPEG", quality=75)
-            tmp_path = tmp.name
+            for chunk in chunks:
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                    chunk.convert('L').save(tmp.name, "JPEG", quality=75)
+                    tmp_path = tmp.name
 
-        for attempt in range(3):
-            try:
-                extracted_text = _ocr_with_timeout(tmp_path)
-                full_text += "\n" + extracted_text
-                break
-            except FuturesTimeout:
-                print(f"⚠️ [Processor] OCR call timed out after {_OCR_CALL_TIMEOUT}s (attempt {attempt+1}/3)")
-                if attempt == 2:
-                    ocr_timeout_occurred = True
-                    timeout_details.append(f"Page {page_idx}")
-                    print(f"⚠️ [Processor] Skipping page {page_idx} due to timeout")
-            except Exception as e:
-                if _AirflowTaskTimeout and isinstance(e, _AirflowTaskTimeout):
-                    raise  # task-level timeout — never retry
-                print(f"⚠️ [Processor] OCR error attempt {attempt+1}: {e}")
-                if attempt == 2:
-                    raise
-                time.sleep(3)
+                # Retry up to 3 times — only on API/timeout errors.
+                # AirflowTaskTimeout must propagate immediately (no retry).
+                for attempt in range(3):
+                    try:
+                        extracted_text = _ocr_with_timeout(tmp_path)
+                        full_text += "\n" + extracted_text
+                        break
+                    except FuturesTimeout:
+                        print(f"⚠️ [Processor] OCR call timed out after {_OCR_CALL_TIMEOUT}s (attempt {attempt+1}/3)")
+                        if attempt == 2:
+                            ocr_timeout_occurred = True
+                            timeout_details.append(f"Chunk of page {page_idx}")
+                            print(f"⚠️ [Processor] Skipping this chunk due to timeout")
+                    except Exception as e:
+                        if _AirflowTaskTimeout and isinstance(e, _AirflowTaskTimeout):
+                            raise  # task-level timeout — never retry
+                        print(f"⚠️ [Processor] OCR error attempt {attempt+1}: {e}")
+                        if attempt == 2:
+                            raise
+                        time.sleep(3)
 
-        os.remove(tmp_path)
+                os.remove(tmp_path)
+        else:
+            # 📄 บัญชีรายชื่อ: ส่งทั้งหน้า (ย่อเป็นขาวดำ)
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                img.convert('L').save(tmp.name, "JPEG", quality=75)
+                tmp_path = tmp.name
+
+            for attempt in range(3):
+                try:
+                    extracted_text = _ocr_with_timeout(tmp_path)
+                    full_text += "\n" + extracted_text
+                    break
+                except FuturesTimeout:
+                    print(f"⚠️ [Processor] OCR call timed out after {_OCR_CALL_TIMEOUT}s (attempt {attempt+1}/3)")
+                    if attempt == 2:
+                        ocr_timeout_occurred = True
+                        timeout_details.append(f"Page {page_idx}")
+                        print(f"⚠️ [Processor] Skipping page {page_idx} due to timeout")
+                except Exception as e:
+                    if _AirflowTaskTimeout and isinstance(e, _AirflowTaskTimeout):
+                        raise  # task-level timeout — never retry
+                    print(f"⚠️ [Processor] OCR error attempt {attempt+1}: {e}")
+                    if attempt == 2:
+                        raise
+                    time.sleep(3)
+
+            os.remove(tmp_path)
 
     # นำ Text ที่ได้ไปเข้ากระบวนการ Parser (สกัดตัวเลข) แล้ว Validate ด้วย ElectionValidator
     parsed_data = parser.parse_markdown(full_text)
