@@ -26,14 +26,27 @@ class ElectionOCRParser:
         }
 
         # ค้นหาตาราง (รองรับทั้ง MD และ HTML)
-        rows = re.findall(r'\|\s*[\d๑-๙]+\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|', markdown_text)
-        if not rows:
-            rows = re.findall(r'<tr>.*?<td>.*?</td><td>(.*?)</td><td>(.*?)</td>.*?</tr>', markdown_text, re.DOTALL)
-
-        for name, score in rows:
-            clean_name = re.sub(r'<[^>]+>', '', name).strip()
-            if "ชื่อ" in clean_name or "พรรค" in clean_name: continue
-            data['scores'][clean_name] = self.clean_score_to_int(score)
+        tr_matches = re.findall(r'<tr[^>]*>(.*?)</tr>', markdown_text, re.DOTALL | re.IGNORECASE)
+        if tr_matches:
+            for tr in tr_matches:
+                cells = re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>', tr, re.DOTALL | re.IGNORECASE)
+                if len(cells) >= 3:
+                    clean_name = re.sub(r'<[^>]+>', '', cells[1]).strip()
+                    clean_score = re.sub(r'<[^>]+>', '', cells[-1]).strip()
+                    if "ชื่อ" in clean_name or "พรรค" in clean_name: continue
+                    data['scores'][clean_name] = self.clean_score_to_int(clean_score)
+        else:
+            lines = markdown_text.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('|') and line.endswith('|'):
+                    cells = [c.strip() for c in line.split('|') if c.strip()]
+                    if len(cells) >= 3 and not all(c == '-' for c in cells[0].replace(' ', '')):
+                        if re.search(r'[\d๑-๙]', cells[0]):
+                            clean_name = re.sub(r'<[^>]+>', '', cells[1]).strip()
+                            clean_score = re.sub(r'<[^>]+>', '', cells[-1]).strip()
+                            if "ชื่อ" in clean_name or "พรรค" in clean_name: continue
+                            data['scores'][clean_name] = self.clean_score_to_int(clean_score)
 
         return data
 
