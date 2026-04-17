@@ -143,6 +143,9 @@ def process_pages(doc, page_indices, file_type, parser, master_candidates, maste
                     try:
                         extracted_text = _ocr_with_timeout(tmp_path)
                         full_text += "\n" + extracted_text
+                        print(f"🎊🎊🎊🎊 OCR page {page_idx} attempt {attempt+1} completed")
+                        print(f"📚 ----- extracted text -----")
+                        print(extracted_text)
                         break
                     except FuturesTimeout:
                         print(f"⚠️ [Processor] OCR call timed out after {_OCR_CALL_TIMEOUT}s (attempt {attempt+1}/3)")
@@ -159,6 +162,7 @@ def process_pages(doc, page_indices, file_type, parser, master_candidates, maste
                         time.sleep(3)
 
                 os.remove(tmp_path)
+            
         else:
             # 📄 บัญชีรายชื่อ: ส่งทั้งหน้า (ย่อเป็นขาวดำ)
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
@@ -169,6 +173,9 @@ def process_pages(doc, page_indices, file_type, parser, master_candidates, maste
                 try:
                     extracted_text = _ocr_with_timeout(tmp_path)
                     full_text += "\n" + extracted_text
+                    print(f"🎊🎊🎊🎊 OCR page {page_idx} attempt {attempt+1} completed")
+                    print(f"📚 ----- extracted text -----")
+                    print(extracted_text)
                     break
                 except FuturesTimeout:
                     print(f"⚠️ [Processor] OCR call timed out after {_OCR_CALL_TIMEOUT}s (attempt {attempt+1}/3)")
@@ -186,10 +193,19 @@ def process_pages(doc, page_indices, file_type, parser, master_candidates, maste
 
             os.remove(tmp_path)
 
+    print("✅ OCR completed")
     # นำ Text ที่ได้ไปเข้ากระบวนการ Parser (สกัดตัวเลข) แล้ว Validate ด้วย ElectionValidator
-    parsed_data = parser.parse_markdown(full_text)
+    print(f"📚 ----- full text -----")
+    print(full_text)
+    parsed_data = parser.parse_markdown(full_text, form_type=file_type)
+    print(f"📚 ----- parsed data -----")
+    print(parsed_data)
     validator = ElectionValidator(master_candidates, master_parties)
     cleaned_data, flags_data = validator.validate(parsed_data, form_type=file_type)
+    print(f"📚 ----- cleaned data -----")
+    print(cleaned_data)
+    print(f"📚 ----- flags data -----")
+    print(flags_data)
 
     # Add OCR timeout flag to the flags_data
     if ocr_timeout_occurred:
