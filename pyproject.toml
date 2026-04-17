@@ -1,0 +1,25 @@
+[project]
+name = "dsde-final-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "ipykernel>=7.2.0",
+    "numpy>=2.0.0",
+    "pandas>=3.0.2",
+    "pythainlp>=5.3.1",
+    "requests>=2.33.1",
+]
+
+[tool.uv.workspace]
+members = [
+    "wikipedia-scraped",
+    "election_pipeline",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

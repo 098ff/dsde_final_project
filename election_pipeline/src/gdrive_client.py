@@ -9,7 +9,7 @@ from googleapiclient.http import MediaIoBaseDownload
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 def get_gdrive_service():
-    """สร้าง Service Object โดยใช้ Token หากไม่มีให้ Auth ใหม่ (ทำในเครื่อง Local ก่อนเอาขึ้น Airflow)"""
+    """สร้าง Service Object โดยใช้ Token หากไม่มีให้ Auth ใหม่"""
     creds = None
     if os.path.exists('credentials/token.json'):
         creds = Credentials.from_authorized_user_file('credentials/token.json', SCOPES)
@@ -24,10 +24,12 @@ def get_gdrive_service():
     return build('drive', 'v3', credentials=creds)
 
 def list_folders_in_folder(service, parent_folder_id, folder_name=None):
-    """ค้นหาโฟลเดอร์ลูก (เช่น หาตำบลในอำเภอ, หาหน่วยในตำบล)"""
+    """ค้นหาโฟลเดอร์ลูก (รองรับการหาชื่อบางส่วนแบบ Contains)"""
     query = f"'{parent_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+    
     if folder_name:
-        query += f" and name='{folder_name}'"
+        query += f" and name contains '{folder_name}'"
+        
     results = service.files().list(q=query, fields="files(id, name)").execute()
     return results.get('files', [])
 

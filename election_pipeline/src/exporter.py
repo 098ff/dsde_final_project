@@ -4,11 +4,15 @@ import os
 from pathlib import Path
 from src.config import BASE_OUTPUT_DIR
 
-def export_individual_result(data, tambon, unit, file_name, format_type='csv'):
-    """บันทึกไฟล์รายหน่วยลงในโฟลเดอร์ output_data/ตำบล/หน่วย/"""
+def export_individual_result(data, amphoe, tambon, unit, file_name, format_type='csv'):
+    """บันทึกไฟล์รายหน่วยลงในโฟลเดอร์ output_data/ตำบล/หน่วย/ (หรือ output_data/อำเภอ/ สำหรับเคสพิเศษ)"""
     
     # สร้างโครงสร้าง Folder
-    target_dir = BASE_OUTPUT_DIR / tambon / unit
+    if not tambon and not unit:
+        target_dir = BASE_OUTPUT_DIR / amphoe
+    else:
+        target_dir = BASE_OUTPUT_DIR / tambon / unit
+        
     target_dir.mkdir(parents=True, exist_ok=True)
     
     # กำหนดชื่อไฟล์ output
