@@ -12,7 +12,7 @@ class ElectionOCRParser:
         """
         return clean_score_to_int(score_str)
 
-    def parse_markdown(self, markdown_text):
+    def parse_markdown(self, markdown_text, form_type=None):
         data = {
             "eligible_voters": self.extract_number(r'ผู้มีสิทธิเลือกตั้ง.*?จำนวน\s*([\d,๑-๙]+)', markdown_text),
             "voters_showed_up": self.extract_number(r'มาแสดงตน.*?จำนวน\s*([\d,๑-๙]+)', markdown_text),
@@ -32,8 +32,13 @@ class ElectionOCRParser:
                 cells = re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>', tr, re.DOTALL | re.IGNORECASE)
                 if len(cells) >= 3:
                     clean_name = re.sub(r'<[^>]+>', '', cells[1]).strip()
-                    clean_score = re.sub(r'<[^>]+>', '', cells[-1]).strip()
                     if "ชื่อ" in clean_name or "พรรค" in clean_name: continue
+                    if form_type == "บัญชีรายชื่อ" and len(cells) == 4:
+                        col3 = re.sub(r'<[^>]+>', '', cells[2]).strip()
+                        col4 = re.sub(r'<[^>]+>', '', cells[3]).strip()
+                        clean_score = f"{col3} {col4}" if col4.startswith('(') and col4.endswith(')') else f"{col3} ({col4})"
+                    else:
+                        clean_score = re.sub(r'<[^>]+>', '', cells[-1]).strip()
                     data['scores'][clean_name] = self.clean_score_to_int(clean_score)
         else:
             lines = markdown_text.split('\n')
@@ -44,8 +49,13 @@ class ElectionOCRParser:
                     if len(cells) >= 3 and not all(c == '-' for c in cells[0].replace(' ', '')):
                         if re.search(r'[\d๑-๙]', cells[0]):
                             clean_name = re.sub(r'<[^>]+>', '', cells[1]).strip()
-                            clean_score = re.sub(r'<[^>]+>', '', cells[-1]).strip()
                             if "ชื่อ" in clean_name or "พรรค" in clean_name: continue
+                            if form_type == "บัญชีรายชื่อ" and len(cells) == 4:
+                                col3 = re.sub(r'<[^>]+>', '', cells[2]).strip()
+                                col4 = re.sub(r'<[^>]+>', '', cells[3]).strip()
+                                clean_score = f"{col3} {col4}" if col4.startswith('(') and col4.endswith(')') else f"{col3} ({col4})"
+                            else:
+                                clean_score = re.sub(r'<[^>]+>', '', cells[-1]).strip()
                             data['scores'][clean_name] = self.clean_score_to_int(clean_score)
 
         return data
