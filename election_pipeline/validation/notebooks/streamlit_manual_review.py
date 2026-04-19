@@ -162,7 +162,7 @@ selected_flag_cols: list[str] = st.sidebar.multiselect(
     help="Show only rows where ALL selected flags are True",
 )
 
-hide_reviewed = st.sidebar.checkbox("Hide reviewed units", value=False)
+hide_reviewed = st.sidebar.checkbox("Hide reviewed units", value=True)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Pagination")
