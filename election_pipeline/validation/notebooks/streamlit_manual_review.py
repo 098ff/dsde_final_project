@@ -34,6 +34,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 CSV_PATH = Path(__file__).parent.parent.parent / "output_data" / "master_summary_log.csv"
+REVIEWED_CSV_PATH = Path(__file__).parent.parent.parent / "output_data" / "reviewed_units.csv"
 
 _ALL_FLAG_COLS = [
     "flag_math_total_used",
@@ -86,6 +87,33 @@ st.set_page_config(page_title="Manual Review Queue", layout="wide")
 # Load data
 # ---------------------------------------------------------------------------
 
+def load_reviewed_units() -> set[tuple[str, str, str]]:
+    if not REVIEWED_CSV_PATH.exists():
+        return set()
+    try:
+        df_rev = pd.read_csv(REVIEWED_CSV_PATH)
+        if df_rev.empty:
+            return set()
+        return set(zip(df_rev["amphoe"].astype(str), df_rev["tambon"].astype(str), df_rev["unit"].astype(str)))
+    except Exception:
+        return set()
+
+def save_reviewed_units(reviewed: set[tuple[str, str, str]]):
+    df_rev = pd.DataFrame(list(reviewed), columns=["amphoe", "tambon", "unit"])
+    REVIEWED_CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
+    df_rev.to_csv(REVIEWED_CSV_PATH, index=False)
+
+def toggle_review_callback(id_tuple: tuple[str, str, str], cb_key: str):
+    """Callback to update reviewed units without manual rerun lag."""
+    if st.session_state[cb_key]:
+        st.session_state.reviewed_units.add(id_tuple)
+    else:
+        st.session_state.reviewed_units.discard(id_tuple)
+    save_reviewed_units(st.session_state.reviewed_units)
+
+if "reviewed_units" not in st.session_state:
+    st.session_state.reviewed_units = load_reviewed_units()
+
 if not CSV_PATH.exists():
     st.error(f"CSV not found at {CSV_PATH}")
     st.stop()
@@ -134,6 +162,18 @@ selected_flag_cols: list[str] = st.sidebar.multiselect(
     help="Show only rows where ALL selected flags are True",
 )
 
+hide_reviewed = st.sidebar.checkbox("Hide reviewed units", value=True)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("Pagination")
+units_per_page = st.sidebar.number_input(
+    "Units per page",
+    min_value=1,
+    max_value=500,
+    value=20,
+    help="Reducing this number improves performance",
+)
+
 # ---------------------------------------------------------------------------
 # Apply filters
 # ---------------------------------------------------------------------------
@@ -153,6 +193,23 @@ if selected_flag_cols:
     mask = df[selected_flag_cols].all(axis=1)
     df = df[mask]
 
+if hide_reviewed and st.session_state.reviewed_units:
+    # Vectorized filtering for better performance
+    rev_keys = {f"{a}|{t}|{u}" for a, t, u in st.session_state.reviewed_units}
+    df_keys = df["amphoe"].astype(str) + "|" + df["tambon"].astype(str) + "|" + df["unit"].astype(str)
+    df = df[~df_keys.isin(rev_keys)]
+
+# Apply pagination to the unique units to limit rendered components
+unique_units = df[["amphoe", "tambon", "unit"]].drop_duplicates()
+total_units = len(unique_units)
+total_pages = (total_units - 1) // units_per_page + 1
+page_num = st.sidebar.number_input("Page", min_value=1, max_value=max(1, total_pages), value=1)
+
+if not unique_units.empty:
+    start_idx = (page_num - 1) * int(units_per_page)
+    end_idx = start_idx + int(units_per_page)
+    current_units_slice = unique_units.iloc[start_idx:end_idx]
+    df = df.merge(current_units_slice, on=["amphoe", "tambon", "unit"])
 
 # ---------------------------------------------------------------------------
 # Section 1 — Flag summary
@@ -194,7 +251,7 @@ if HAS_PLOTLY:
         height=350,
         margin=dict(l=20, r=40, t=40, b=20),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 elif HAS_ALTAIR:
     chart = (
@@ -208,7 +265,7 @@ elif HAS_ALTAIR:
         )
         .properties(title="Records per Flag (filtered)", height=300)
     )
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width="stretch")
 
 else:
     st.warning("Neither plotly nor altair is installed — showing raw table instead.")
@@ -230,7 +287,7 @@ for col in FLAG_COLS:
             detail_cols = ["tambon", "unit", "type", "details"]
             st.dataframe(
                 affected[detail_cols].reset_index(drop=True),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -267,14 +324,32 @@ else:
         for unit, unit_df in tambon_df.groupby("unit", sort=True):
             record_count = len(unit_df)
             flag_hits = int(unit_df["flag_count"].sum())
-            st.markdown(f"**หน่วยเลือกตั้ง {unit}**")
-            st.caption(f"{record_count} records | {flag_hits} flag hits")
+            
+            col1, col2 = st.columns([0.8, 0.2])
+            with col1:
+                st.markdown(f"**หน่วยเลือกตั้ง {unit}**")
+                st.caption(f"{record_count} records | {flag_hits} flag hits")
+            
+            with col2:
+                amphoe_str = str(unit_df["amphoe"].iloc[0])
+                tambon_str = str(tambon)
+                unit_str = str(unit)
+                key = (amphoe_str, tambon_str, unit_str)
+                is_reviewed = key in st.session_state.reviewed_units
+                cb_key = f"rev_{amphoe_str}_{tambon_str}_{unit_str}"
+                st.checkbox(
+                    "Reviewed",
+                    value=is_reviewed,
+                    key=cb_key,
+                    on_change=toggle_review_callback,
+                    args=(key, cb_key),
+                )
 
             table_df = unit_df[display_cols].reset_index(drop=True)
             st.dataframe(
                 table_df,
                 column_config=col_config,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
