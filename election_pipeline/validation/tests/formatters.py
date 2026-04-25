@@ -14,7 +14,7 @@ across export formats:
 
 Usage::
 
-    from validation.formatters import prepare_df_for_csv, prepare_data_for_json
+    from validation.tests.formatters import prepare_df_for_csv, prepare_data_for_json
 
     # CSV export
     csv_bytes = prepare_df_for_csv(validated_df)
