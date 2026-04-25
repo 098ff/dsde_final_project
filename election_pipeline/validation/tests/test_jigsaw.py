@@ -20,7 +20,7 @@ import pytest
 
 from validation.linguistic_validator import clean_score_to_int
 from validation.engine import ElectionValidator
-from validation.formatters import prepare_df_for_csv, prepare_data_for_json
+from election_pipeline.validation.tests.formatters import prepare_df_for_csv, prepare_data_for_json
 
 
 # ===========================================================================
@@ -425,7 +425,7 @@ class TestJigsawIntegration:
         validator = make_validator()
         raw = self._mock_pipeline_record()
         cleaned, flags = validator.validate(raw)
-        from validation.formatters import prepare_data_for_json
+        from election_pipeline.validation.tests.formatters import prepare_data_for_json
         combined = {"cleaned": cleaned, "flags": flags}
         json_safe = prepare_data_for_json(combined)
         # Should not raise
