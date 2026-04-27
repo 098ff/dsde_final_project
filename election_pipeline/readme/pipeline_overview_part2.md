@@ -231,20 +231,178 @@ flowchart TD
 
 ## Part 6: Manual Review Tools
 
-### 6.1 Streamlit Dashboard (`streamlit_manual_review.py`)
+เครื่องมือสำหรับตรวจสอบและแก้ไขข้อมูล OCR ด้วยมือ ประกอบด้วย 3 ส่วนหลัก:
+
+1. **`verify_manual_ocr.py`** — CLI script ตรวจสอบ structure + math ของ CSV ที่แก้ไขแล้ว
+2. **`streamlit_manual_review.py`** — Web dashboard แสดง Verification Report + ติดตาม resolution
+3. **`manual_review_queue.ipynb`** — Jupyter Notebook (legacy) สำหรับตรวจ flag จาก master log
+
+```mermaid
+flowchart TD
+    subgraph INPUT["📂 Input Data"]
+        EXPECTED["_expected_structure.py<br/>(295 หน่วยเลือกตั้ง)"]
+        VERIFIED["verfied_ocr_data/<br/>(CSV ที่แก้ไขด้วยมือแล้ว)"]
+    end
+
+    subgraph VERIFY["🔍 verify_manual_ocr.py"]
+        S1["Step 1: Structure Check<br/>เทียบโฟลเดอร์กับ expected list"]
+        S2["Step 2: Math Check<br/>ตรวจสมการบัตร + คะแนน"]
+    end
+
+    subgraph OUTPUT["📊 Output"]
+        TERM["Terminal Report<br/>(ANSI colourised)"]
+        RCSV["verification_report.csv"]
+    end
+
+    subgraph DASHBOARD["🖥️ Streamlit Dashboard"]
+        TAB["🔍 Verification Report Tab"]
+        SIDEBAR["Sidebar Filters<br/>(อำเภอ, ตำบล, Issue Type, Resolution)"]
+        METRICS["Summary Metrics<br/>(Total, Structural, Math, Fixed)"]
+        RESOLVE["Resolution Selectbox<br/>(SOURCE_ERROR / FIXED)"]
+        RESCSV["verification_resolutions.csv"]
+    end
+
+    EXPECTED --> S1
+    VERIFIED --> S1
+    VERIFIED --> S2
+    S1 --> TERM
+    S2 --> TERM
+    S1 --> RCSV
+    S2 --> RCSV
+    RCSV --> TAB
+    TAB --> SIDEBAR
+    TAB --> METRICS
+    TAB --> RESOLVE
+    RESOLVE --> RESCSV
+```
+
+---
+
+### 6.1 `verify_manual_ocr.py` — CLI Verification Script
+
+**Run**: `python election_pipeline/validation/verify_manual_ocr.py`
+
+สคริปต์หลักสำหรับตรวจสอบความถูกต้องของ CSV ใน `verfied_ocr_data/` ทำงาน 2 ขั้นตอน:
+
+#### Step 1: Structure Check — ตรวจความครบถ้วนของโฟลเดอร์ + ไฟล์
+
+| Check | Logic | Issue Type |
+|---|---|---|
+| **โฟลเดอร์หาย** | เทียบ `EXPECTED_UNITS` (295 หน่วย) กับ `verfied_ocr_data/` — ถ้าหน่วยใดไม่มีโฟลเดอร์ | `MISSING_FOLDER` |
+| **CSV ไม่ครบ** | แต่ละโฟลเดอร์ปกติต้องมี `summary_แบ่งเขต.csv` **และ** `summary_บัญชีรายชื่อ.csv` | `MISSING_CSV` |
+
+> [!NOTE]
+> โฟลเดอร์ "ล่วงหน้าในเขต" และ "ล่วงหน้านอกเขตฯ" ถูก **ข้ามการตรวจ 2-file rule** เพราะมีโครงสร้างพิเศษ (ไม่มี tambon/unit sub-directory)
+
+**Expected Structure Source**: `_expected_structure.py` — ไฟล์ hardcode ค่า `EXPECTED_UNITS` เป็น set ของ tuple `(amphoe, tambon, unit)` ทั้ง 295 หน่วย เพื่อไม่ต้องพึ่ง `raw_pdf/` folder จริง
+
+#### Step 2: Math Check — ตรวจสมการบัตรเลือกตั้ง + คะแนน
+
+สำหรับ **ทุก CSV** ใน `verfied_ocr_data/` จะตรวจ 3 สมการ:
+
+| # | สมการ | Issue Type | ตัวอย่าง Detail |
+|---|---|---|---|
+| 1 | `ballots_allocated = ballots_used + ballots_remaining` | `MATH_ALLOCATION` | `ballots_allocated (810) ≠ ballots_used (800) + ballots_remaining (9) = 809` |
+| 2 | `ballots_used = valid_ballots + invalid_ballots + no_vote_ballots` | `MATH_USED` | `ballots_used (800) ≠ valid (750) + invalid (30) + no_vote (19) = 799` |
+| 3 | `sum(scores.*) = valid_ballots` | `MATH_SCORES` | `sum(scores) (745) ≠ valid_ballots (750)` |
+
+ถ้า field ใดหายไป (NaN) จะ report เป็น `MATH_MISSING_FIELD` แทน
+
+นอกจากนี้ยังตรวจ **Metadata Mismatch** — เปรียบเทียบค่า `metadata.amphoe`, `metadata.tambon`, `metadata.unit` ใน CSV กับชื่อโฟลเดอร์ที่ไฟล์อยู่ ถ้าไม่ตรงกันจะ report เป็น `METADATA_MISMATCH`
+
+#### Output Files
+
+| Output | Path | รายละเอียด |
+|---|---|---|
+| **Terminal report** | stdout | ANSI colourised, แบ่ง section Structure / Math / Summary |
+| **CSV report** | `output_data/verification_report.csv` | ทุก issue ใน format: `amphoe, tambon, unit, file_type, issue_type, issue_details` |
+
+---
+
+### 6.2 Streamlit Dashboard (`streamlit_manual_review.py`)
 
 **Run**: `streamlit run validation/notebooks/streamlit_manual_review.py`
 
-**Features**:
-- **Sidebar filters**: amphoe, tambon, form type, specific flags
-- **Flag Summary chart** (Plotly/Altair)
-- **Hierarchical view**: ตำบล → หน่วย → records
-- **Reviewed checkbox**: mark as reviewed → save to `reviewed_units.csv`
-- **Pagination**: จำกัดจำนวน units ต่อหน้า
+Web dashboard สำหรับ browse และ resolve issues จาก `verification_report.csv`
 
-### 6.2 Jupyter Notebook (`manual_review_queue.ipynb`)
+> [!NOTE]
+> Tab "Manual Review Queue" (ที่เคยอ่านจาก `master_summary_log.csv`) ถูก **comment out** แล้ว เนื่องจาก master log ถูกลบออกจาก pipeline — ปัจจุบันเหลือแค่ Tab "Verification Report"
 
-Notebook สำหรับ manual correction ของข้อมูล CSV ที่ OCR อ่านผิด
+#### Tab: 🔍 Verification Report
+
+```mermaid
+flowchart TD
+    CSV["verification_report.csv"] --> LOAD["load_verification_report()"]
+    RES_CSV["verification_resolutions.csv"] --> LOAD_RES["load_resolutions()"]
+    
+    LOAD --> METRICS["📊 Summary Metrics<br/>(5 columns)"]
+    LOAD --> CHART["📊 Issues by Type<br/>(horizontal bar chart)"]
+    LOAD --> GROUPED["📋 Grouped Display<br/>อำเภอ → ตำบล → หน่วย"]
+    
+    LOAD_RES --> STATE["session_state.ver_resolutions"]
+    STATE --> GROUPED
+    
+    GROUPED --> SELECT["Resolution Selectbox<br/>per issue row"]
+    SELECT -->|"on_change"| SAVE["save_resolutions()"]
+    SAVE --> RES_CSV
+```
+
+**Summary Metrics** (แถบด้านบน):
+
+| Metric | คำอธิบาย |
+|---|---|
+| Total Issues | จำนวน issue ทั้งหมด |
+| 🏗️ Structural | `MISSING_FOLDER` + `MISSING_CSV` + `READ_ERROR` |
+| 🔢 Math | ที่เหลือทั้งหมด (MATH_*) |
+| ⚛️ Source Errors | issue ที่ถูก resolve เป็น `SOURCE_ERROR` |
+| ✅ Fixed | issue ที่ถูก resolve เป็น `FIXED` |
+
+**Sidebar Filters**:
+
+| Filter | Options | Behaviour |
+|---|---|---|
+| อำเภอ (Amphoe) | multiselect จากข้อมูลจริง | กรองตาม amphoe, tambon cascade ตาม amphoe ที่เลือก |
+| ตำบล (Tambon) | multiselect (cascade จาก amphoe) | กรองตาม tambon |
+| Issue Type | multiselect + label mapping | เช่น `MATH_SCORES` → "🔢 Math: Scores" |
+| File Type | multiselect | `summary_แบ่งเขต`, `summary_บัญชีรายชื่อ` |
+| Resolution | multiselect | `— Not reviewed —`, `SOURCE_ERROR`, `FIXED` |
+| Hide resolved | checkbox | ซ่อน issue ที่ resolve แล้ว |
+
+**Grouped Display** — แสดงข้อมูลตาม hierarchy:
+
+```
+▸ อำเภอบ้านไร่ — 12 issue(s) · 5 unreviewed     ← expander (เปิดอัตโนมัติถ้ามี unreviewed)
+  ▸ ตำบลคอกควาย — 4 issue(s) · 2 unreviewed      ← nested expander
+      หน่วยเลือกตั้ง หน่วยที่ 1
+        🔢 Math: Scores  `summary_แบ่งเขต`         ← issue label + file type
+        sum(scores) (745) ≠ valid_ballots (750)     ← issue details
+        [Resolution ▼ — Not reviewed —]             ← selectbox per issue
+```
+
+**Resolution Workflow**:
+
+| Resolution | Emoji | ความหมาย |
+|---|---|---|
+| `— Not reviewed —` | — | ยังไม่ได้ตรวจ |
+| `SOURCE_ERROR` | ⚛️ | ข้อมูลต้นทางผิด แก้ไม่ได้ |
+| `FIXED` | ✅ | แก้ไขแล้ว |
+
+ทุกครั้งที่เปลี่ยน resolution จะ **auto-save** ลงไฟล์ `output_data/verification_resolutions.csv` ทันที ผ่าน `on_change` callback — ไม่ต้องกดปุ่ม save แยก
+
+**ไฟล์ที่เกี่ยวข้อง**:
+
+| File | Read/Write | คำอธิบาย |
+|---|---|---|
+| `output_data/verification_report.csv` | Read | ผลจาก `verify_manual_ocr.py` |
+| `output_data/verification_resolutions.csv` | Read + Write | เก็บ resolution ที่ user เลือก (key → resolution) |
+| `output_data/reviewed_units.csv` | Read + Write | เก็บ units ที่ mark ว่า reviewed แล้ว (legacy, ใช้กับ Tab 1 ที่ถูก comment out) |
+
+**Dependencies**:
+
+| Library | ใช้ทำอะไร | Fallback |
+|---|---|---|
+| `plotly` | Bar chart แบบ interactive | ถ้าไม่มี ใช้ `altair`, ถ้าไม่มีทั้งคู่ → raw dataframe |
+| `streamlit` | Web UI framework | — (required) |
 
 ---
 
