@@ -156,3 +156,6 @@ mock/
 *test.csv
 *.csv
 *.json
+
+verfied_ocr_data
+raw_pdf
