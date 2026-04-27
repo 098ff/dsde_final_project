@@ -28,17 +28,3 @@ def export_individual_result(data, amphoe, tambon, unit, file_name, format_type=
             json.dump(data, f, ensure_ascii=False, indent=4)
             
     return save_path
-
-def export_summary_report(summary_list, format_type='csv'):
-    """บันทึกไฟล์ Master Log หลังจากรันครบทุกหน่วย"""
-    BASE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    
-    df_summary = pd.DataFrame(summary_list)
-    save_path = BASE_OUTPUT_DIR / f"master_summary_log.{format_type}"
-    
-    if format_type == 'csv':
-        df_summary.to_csv(save_path, index=False, encoding='utf-8-sig')
-    else:
-        df_summary.to_json(save_path, orient='records', force_ascii=False, indent=4)
-        
-    print(f"📊 [Exporter] บันทึก Master Summary เรียบร้อยที่: {save_path}")

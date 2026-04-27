@@ -16,7 +16,8 @@ _SLEEP_SECS  = 3 if RATE_LIMIT else 0
 from src.gdrive_client import get_gdrive_service, list_folders_in_folder, download_files_from_folder
 from src.processor import merge_pdfs, detect_and_route, process_pages
 from src.ocr_parser import ElectionOCRParser
-from src.exporter import export_individual_result, export_summary_report
+# from src.exporter import export_individual_result, export_summary_report
+from src.exporter import export_individual_result
 from src.config import MASTER_PARTIES, MASTER_CANDIDATES, GDRIVE_ROOT_FOLDER_ID
 
 from validation.structural_auditor import audit_units
@@ -110,12 +111,10 @@ def election_ocr_pipeline():
         
         prefix = f"[{unit_info['amphoe']}/{unit_info['tambon']}/{unit_info['unit']}]"
 
-        unit_summary_logs = []
-
         if not pdf_paths:
             print(f"{prefix} ⚠️ No PDF files found")
             shutil.rmtree(temp_dir, ignore_errors=True)
-            return unit_summary_logs
+            return
 
         special_type = unit_info.get("special_type")
 
@@ -146,37 +145,6 @@ def election_ocr_pipeline():
                     **flags_data
                 }
                 export_individual_result(full_record, unit_info['amphoe'], unit_info['tambon'], unit_info['unit'], output_name)
-
-                needs_manual_check = any([
-                    flags_data.get("flag_math_total_used", False),
-                    flags_data.get("flag_math_valid_score", False),
-                    flags_data.get("flag_name_mismatch", False),
-                    flags_data.get("flag_missing_data", False),
-                    flags_data.get("flag_linguistic_mismatch", False),
-                    flags_data.get("flag_ocr_timeout", False),
-                ])
-                detail_parts = [
-                    flags_data.get("flag_math_total_used_detail", ""),
-                    flags_data.get("flag_math_valid_score_detail", ""),
-                    flags_data.get("flag_ocr_timeout_detail", ""),
-                ]
-                details = " | ".join(p for p in detail_parts if p and p != "OK") or "OK"
-
-                unit_summary_logs.append({
-                    "amphoe": unit_info['amphoe'],
-                    "tambon": unit_info['tambon'],
-                    "unit": unit_info['unit'],
-                    "type": file_type,
-                    "file": output_name,
-                    "needs_manual_check": needs_manual_check,
-                    "flag_math_total_used": flags_data.get("flag_math_total_used", False),
-                    "flag_math_valid_score": flags_data.get("flag_math_valid_score", False),
-                    "flag_name_mismatch": flags_data.get("flag_name_mismatch", False),
-                    "flag_missing_data": flags_data.get("flag_missing_data", False),
-                    "flag_linguistic_mismatch": flags_data.get("flag_linguistic_mismatch", False),
-                    "flag_ocr_timeout": flags_data.get("flag_ocr_timeout", False),
-                    "details": details,
-                })
 
         if special_type == "ล่วงหน้านอกเขตและนอกราชอาณาจักร":
             import fitz
@@ -223,53 +191,8 @@ def election_ocr_pipeline():
             combined_doc.close()
 
         shutil.rmtree(temp_dir, ignore_errors=True)
-        return unit_summary_logs
-
-    @task(trigger_rule=TriggerRule.ALL_DONE)
-    def aggregate_summaries(all_unit_logs, **kwargs):
-        """Task 3: รวบรวม Log เซฟเป็น CSV"""
-        failed_count = sum(1 for unit_logs in all_unit_logs if unit_logs is None)
-        flat_logs = [
-            log
-            for unit_logs in all_unit_logs
-            if unit_logs is not None
-            for log in unit_logs
-        ]
-
-        if failed_count:
-            print(f"⚠️ {failed_count} process_unit task(s) failed — their units are absent from this report.")
-
-        records = [
-            {
-                "Tambon": log["tambon"],
-                "Unit":   log["unit"],
-                "form_type": _TYPE_MAP.get(log["type"], "Unknown"),
-            }
-            for log in flat_logs if log["tambon"] or log["unit"] # Skip audit for special cases
-        ]
-        missing_items = audit_units(records)
-
-        incomplete_stations = {
-            (item["Tambon"], item["Unit"])
-            for item in missing_items
-        }
-
-        for log in flat_logs:
-            log["flag_missing_counterpart"] = (
-                log["tambon"], log["unit"]
-            ) in incomplete_stations
-
-        export_summary_report(flat_logs, format_type='csv')
-
-        missing_count = len({(i["Tambon"], i["Unit"]) for i in missing_items})
-        print(
-            f"Pipeline finished. Processed {len(flat_logs)} records. "
-            f"{missing_count} station(s) flagged with flag_missing_counterpart=True."
-            + (f" {failed_count} unit(s) skipped due to task failure." if failed_count else "")
-        )
 
     units_list = discover_units()
-    processed_logs = process_unit.expand(unit_info=units_list)
-    aggregate_summaries(processed_logs)
+    process_unit.expand(unit_info=units_list)
 
 election_dag = election_ocr_pipeline()
