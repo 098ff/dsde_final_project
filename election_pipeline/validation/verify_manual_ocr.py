@@ -27,12 +27,22 @@ from pathlib import Path
 
 import pandas as pd
 
+import importlib.util as _ilu
+_spec = _ilu.spec_from_file_location(
+    "_expected_structure",
+    Path(__file__).resolve().parent / "_expected_structure.py",
+)
+_mod = _ilu.module_from_spec(_spec)  # type: ignore[arg-type]
+_spec.loader.exec_module(_mod)       # type: ignore[union-attr]
+EXPECTED_UNITS: set[tuple[str, str, str]] = _mod.EXPECTED_UNITS
+
 # ── Paths ──────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parents[1]          # election_pipeline/
-RAW_PDF_DIR = ROOT / "raw_pdf"
 VERIFIED_DIR = ROOT / "verfied_ocr_data"
 OUTPUT_DIR = ROOT / "output_data"
 REPORT_CSV = OUTPUT_DIR / "verification_report.csv"
+
+GDRIVE_URL = "https://drive.google.com/drive/folders/1c31r8sI94Azmv2pMX9k7fr1_9xzsBSjF"  # update as needed
 
 # Folders whose *unit* directories are exempt from the 2-file structure check.
 ADVANCE_PREFIXES = ("ล่วงหน้านอกเขต", "ล่วงหน้าในเขต")
@@ -67,24 +77,11 @@ def _is_advance_folder(path: Path) -> bool:
 
 def build_raw_units() -> dict[tuple[str, str, str], Path]:
     """
-    Walk raw_pdf/ and collect all leaf (unit) directories.
-    Returns {(amphoe, tambon, unit): absolute_path}.
+    Returns the hard-coded expected unit structure (295 units).
+    raw_pdf/ is NOT required to run this script.
     """
-    units: dict[tuple[str, str, str], Path] = {}
-    for amphoe_dir in sorted(RAW_PDF_DIR.iterdir()):
-        if not amphoe_dir.is_dir():
-            continue
-        amphoe = amphoe_dir.name
-        for tambon_dir in sorted(amphoe_dir.iterdir()):
-            if not tambon_dir.is_dir():
-                continue
-            tambon = tambon_dir.name
-            for unit_dir in sorted(tambon_dir.iterdir()):
-                if not unit_dir.is_dir():
-                    continue
-                unit = unit_dir.name
-                units[(amphoe, tambon, unit)] = unit_dir
-    return units
+    # Paths are not real filesystem paths here — None signals “expected but not on disk”.
+    return {key: Path() for key in EXPECTED_UNITS}
 
 
 def build_verified_units() -> dict[tuple[str, str, str], Path]:
@@ -437,17 +434,16 @@ def save_report(structure_issues: list[dict], math_issues: list[dict]) -> None:
 def main() -> None:
     print(c(DIM, "\nScanning directories…"))
 
-    if not RAW_PDF_DIR.exists():
-        print(c(RED, f"ERROR: raw_pdf directory not found: {RAW_PDF_DIR}"))
-        sys.exit(1)
     if not VERIFIED_DIR.exists():
-        print(c(RED, f"ERROR: verfied_ocr_data directory not found: {VERIFIED_DIR}"))
+        print(c(RED, "\u274c  ERROR: verfied_ocr_data/ folder not found."))
+        print(c(YELLOW, "   Please download it from Google Drive and place it at:"))
+        print(c(BOLD,   f"   {VERIFIED_DIR}"))
+        print(c(DIM,    f"   URL: {GDRIVE_URL}"))
         sys.exit(1)
 
     # Step 1: Structure
-    print(c(DIM, "  → Building raw_pdf unit list…"))
+    print(c(DIM, f"  → Using {len(EXPECTED_UNITS)} hard-coded expected units…"))
     raw_units = build_raw_units()
-    print(c(DIM, f"     {len(raw_units)} unit(s) found in raw_pdf/"))
 
     print(c(DIM, "  → Building verfied_ocr_data unit list…"))
     verified_units = build_verified_units()
