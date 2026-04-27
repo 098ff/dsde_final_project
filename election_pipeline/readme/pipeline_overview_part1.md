@@ -9,51 +9,62 @@
 ## 🏗️ Pipeline Overview Flow
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph INFRA["☁️ Infrastructure"]
+        direction TB
         GD["Google Drive<br/>(PDF เอกสารเลือกตั้ง)"]
         DOCK["Docker Compose<br/>(Postgres + Airflow)"]
     end
 
     subgraph DAG["⚙️ Airflow DAG: election_ocr_pipeline"]
+        direction TB
         T1["Task 1: discover_units<br/>ค้นหาหน่วยเลือกตั้ง"]
-        T2["Task 2: process_unit<br/>(Dynamic Task Mapping)<br/>OCR + Parse + Validate"]
+        T2["Task 2: process_unit<br/>(Dynamic Task Mapping)"]
     end
 
     subgraph SRC["📦 src/ — Core Processing"]
-        CFG["config.py<br/>Master Data + Paths"]
-        GDC["gdrive_client.py<br/>Download PDFs"]
-        PROC["processor.py<br/>PDF→Image→OCR Text"]
-        PARSE["ocr_parser.py<br/>Text→Structured Data"]
-        EXP["exporter.py<br/>Data→CSV/JSON Files"]
+        direction TB
+        CFG["config.py"]
+        GDC["gdrive_client.py"]
+        PROC["processor.py"]
+        PARSE["ocr_parser.py"]
+        EXP["exporter.py"]
     end
 
     subgraph VAL["✅ validation/ — Quality Assurance"]
+        direction TB
         ENG["engine.py<br/>ElectionValidator"]
-        LING["linguistic_validator.py<br/>Thai Word Cross-check"]
-        FORM["form_identifier.py<br/>แบ่งเขต vs บัญชีรายชื่อ"]
-        STRUCT["structural_auditor.py<br/>ตรวจความครบถ้วน"]
+        LING["linguistic_validator.py"]
+        FORM["form_identifier.py"]
+        STRUCT["structural_auditor.py"]
     end
 
     subgraph OUT["📊 Output"]
+        direction TB
         CSV1["output_data/<br/>ตำบล/หน่วย/*.csv"]
         STRM["Streamlit Manual Review"]
     end
 
+    %% เส้นทางหลักของการทำงาน (Main Flow)
     GD --> T1
     T1 -->|"unit_info list"| T2
 
+    %% การเรียกใช้ Module ใน src/
     T1 --> GDC
     T2 --> GDC
     T2 --> PROC
     PROC --> PARSE
+    
+    %% การส่งไป Validate
     PARSE --> ENG
     ENG --> LING
+    
+    %% การ Export ข้อมูล
     T2 --> EXP
-
     EXP --> CSV1
 
-    CFG -.-> T2
+    %% เส้นประแสดงการดึง Config มาใช้
+    CFG -.->|"import มาใช้"| T2
 
 ```
 
