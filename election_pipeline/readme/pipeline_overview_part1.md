@@ -39,10 +39,16 @@ flowchart LR
         STRUCT["structural_auditor.py"]
     end
 
-    subgraph OUT["📊 Output"]
+    subgraph OUT["📊 Output & Review"]
         direction TB
         CSV1["output_data/<br/>ตำบล/หน่วย/*.csv"]
-        STRM["Streamlit Manual Review"]
+        STRM["Streamlit<br/>Manual Review"]
+    end
+
+    subgraph INSIGHT["💡 Data Analysis & BI"]
+        direction TB
+        EDA["Data Analysis<br/>(Finding Insights)"]
+        BI["BI Dashboard<br/>(Visualization)"]
     end
 
     %% เส้นทางหลักของการทำงาน (Main Flow)
@@ -62,6 +68,11 @@ flowchart LR
     %% การ Export ข้อมูล
     T2 --> EXP
     EXP --> CSV1
+
+    %% ขั้นตอนหลังได้ CSV (Manual Review -> Analysis -> BI)
+    CSV1 -->|"ตรวจสอบความถูกต้อง"| STRM
+    STRM -->|"Validated Clean Data"| EDA
+    EDA -->|"Insights & Metrics"| BI
 
     %% เส้นประแสดงการดึง Config มาใช้
     CFG -.->|"import มาใช้"| T2
