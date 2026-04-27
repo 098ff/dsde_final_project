@@ -319,6 +319,34 @@ def check_math_all(verified_units: dict[tuple[str, str, str], Path]) -> list[dic
                 row_amphoe = str(row.get("metadata.amphoe", amphoe) or amphoe)
                 row_tambon = str(row.get("metadata.tambon", tambon) or tambon)
                 row_unit   = str(row.get("metadata.unit", unit)   or unit)
+
+                # Metadata mismatch check: compare folder path vs CSV metadata columns.
+                # Attribute the issue to the folder location so it's easy to find the file.
+                meta_mismatches: list[str] = []
+                if row_amphoe.strip() != amphoe.strip():
+                    meta_mismatches.append(
+                        f"amphoe: folder='{amphoe}' vs metadata='{row_amphoe}'"
+                    )
+                if tambon and row_tambon.strip() != tambon.strip():
+                    meta_mismatches.append(
+                        f"tambon: folder='{tambon}' vs metadata='{row_tambon}'"
+                    )
+                if unit and row_unit.strip() != unit.strip():
+                    meta_mismatches.append(
+                        f"unit: folder='{unit}' vs metadata='{row_unit}'"
+                    )
+                if meta_mismatches:
+                    all_issues.append(
+                        dict(
+                            amphoe=amphoe,
+                            tambon=tambon,
+                            unit=unit,
+                            file_type=csv_path.stem,
+                            issue_type="METADATA_MISMATCH",
+                            issue_details="; ".join(meta_mismatches),
+                        )
+                    )
+
                 row_issues = check_math_row(
                     row,
                     amphoe=row_amphoe,
@@ -343,6 +371,7 @@ ISSUE_LABELS = {
     "MATH_USED":        ("🔢 MATH (used)",       RED),
     "MATH_SCORES":      ("🔢 MATH (scores)",     RED),
     "MATH_MISSING_FIELD": ("⚠️  MATH (missing field)", YELLOW),
+    "METADATA_MISMATCH":  ("⚠️  METADATA MISMATCH",   YELLOW),
 }
 
 
