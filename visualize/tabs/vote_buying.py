@@ -108,8 +108,16 @@ def render_vote_buying_tab(
     ]
     display_cols_small = [c for c in display_cols_small if c in small_parties.columns]
 
-    sort_col = "PCA_Index" if "PCA_Index" in display_cols_small else (display_cols_small[0] if display_cols_small else None)
-    sorted_small = small_parties[display_cols_small].sort_values(sort_col).reset_index(drop=True) if sort_col else small_parties[display_cols_small].reset_index(drop=True)
+    sort_col = (
+        "PCA_Index"
+        if "PCA_Index" in display_cols_small
+        else (display_cols_small[0] if display_cols_small else None)
+    )
+    sorted_small = (
+        small_parties[display_cols_small].sort_values(sort_col).reset_index(drop=True)
+        if sort_col
+        else small_parties[display_cols_small].reset_index(drop=True)
+    )
     st.dataframe(
         sorted_small,
         use_container_width=True,
@@ -117,7 +125,9 @@ def render_vote_buying_tab(
         column_config={
             "Party": st.column_config.TextColumn("Party Name (พรรค)"),
             "PCA_Index": st.column_config.NumberColumn(
-                "PCA Index", format="%.3f", help="Lower = more 'small-party' characteristics"
+                "PCA Index",
+                format="%.3f",
+                help="Lower = more 'small-party' characteristics",
             ),
             "sent_pm_district_ratio": st.column_config.NumberColumn(
                 "District MP Ratio", format="%.3f"
@@ -128,11 +138,15 @@ def render_vote_buying_tab(
             "social_media_followers_scaled": st.column_config.NumberColumn(
                 "Social Media (scaled)", format="%.3f"
             ),
-            "branch_scaled": st.column_config.NumberColumn("Branches (scaled)", format="%.3f"),
+            "branch_scaled": st.column_config.NumberColumn(
+                "Branches (scaled)", format="%.3f"
+            ),
             "representative_scaled": st.column_config.NumberColumn(
                 "Representatives (scaled)", format="%.3f"
             ),
-            "member_scaled": st.column_config.NumberColumn("Members (scaled)", format="%.3f"),
+            "member_scaled": st.column_config.NumberColumn(
+                "Members (scaled)", format="%.3f"
+            ),
             "trends_scaled": st.column_config.NumberColumn(
                 "Google Trends (scaled)", format="%.3f"
             ),
@@ -189,31 +203,29 @@ def _render_suspect_map_or_table(
 
         station_rows = _enrich_suspect_with_coords(suspect_stations, geo_df)
 
-            if not station_rows.empty and "lat" in station_rows.columns:
-                layer = pdk.Layer(
-                    "ScatterplotLayer",
-                    data=station_rows,
-                    get_position="[lon, lat]",
-                    get_color="[220, 50, 50, 200]",
-                    get_radius=5000,
-                    pickable=True,
+        if not station_rows.empty and "lat" in station_rows.columns:
+            layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=station_rows,
+                get_position="[lon, lat]",
+                get_color="[220, 50, 50, 200]",
+                get_radius=5000,
+                pickable=True,
+            )
+            view_state = pdk.ViewState(
+                latitude=15.5,
+                longitude=101.0,
+                zoom=5,
+                pitch=0,
+            )
+            st.pydeck_chart(
+                pdk.Deck(
+                    layers=[layer],
+                    initial_view_state=view_state,
+                    tooltip={"text": "{Amphoe} / {Tambon}\n{Unit}"},
                 )
-                view_state = pdk.ViewState(
-                    latitude=15.5,
-                    longitude=101.0,
-                    zoom=5,
-                    pitch=0,
-                )
-                st.pydeck_chart(
-                    pdk.Deck(
-                        layers=[layer],
-                        initial_view_state=view_state,
-                        tooltip={
-                            "text": "{Amphoe} / {Tambon}\n{Unit}"
-                        },
-                    )
-                )
-                map_rendered = True
+            )
+            map_rendered = True
     except Exception:  # noqa: BLE001
         pass  # Fall through to table display
 
@@ -245,7 +257,10 @@ def _enrich_suspect_with_coords(
     Adds a small per-row jitter so stations within the same tambon don't stack.
     """
     import math  # noqa: PLC0415
-    from visualize.data_loader import resolve_thai_coords  # noqa: PLC0415
+    try:
+        from data_loader import resolve_thai_coords  # noqa: PLC0415
+    except ImportError:
+        from visualize.data_loader import resolve_thai_coords  # noqa: PLC0415
 
     rows = []
     for idx, row in enumerate(suspect_df.itertuples(index=False)):
@@ -256,12 +271,14 @@ def _enrich_suspect_with_coords(
         jitter = 0.008
         lat = base_lat + jitter * math.sin(idx * 0.7)
         lon = base_lon + jitter * math.cos(idx * 0.7)
-        rows.append({
-            "Amphoe": amphoe,
-            "Tambon": tambon,
-            "Unit": getattr(row, "Unit", ""),
-            "lat": lat,
-            "lon": lon,
-        })
+        rows.append(
+            {
+                "Amphoe": amphoe,
+                "Tambon": tambon,
+                "Unit": getattr(row, "Unit", ""),
+                "lat": lat,
+                "lon": lon,
+            }
+        )
 
     return pd.DataFrame(rows)

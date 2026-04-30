@@ -193,7 +193,10 @@ def _enrich_with_coords(
     Uses a hardcoded tambon/amphoe → (lat, lon) table so Thai names resolve
     correctly without requiring an English GeoJSON match.
     """
-    from visualize.data_loader import resolve_thai_coords  # noqa: PLC0415
+    try:
+        from data_loader import resolve_thai_coords  # noqa: PLC0415
+    except ImportError:
+        from visualize.data_loader import resolve_thai_coords  # noqa: PLC0415
 
     enriched = ratio_df.copy().reset_index(drop=True)
 
