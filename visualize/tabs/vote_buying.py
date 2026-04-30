@@ -108,8 +108,10 @@ def render_vote_buying_tab(
     ]
     display_cols_small = [c for c in display_cols_small if c in small_parties.columns]
 
+    sort_col = "PCA_Index" if "PCA_Index" in display_cols_small else (display_cols_small[0] if display_cols_small else None)
+    sorted_small = small_parties[display_cols_small].sort_values(sort_col).reset_index(drop=True) if sort_col else small_parties[display_cols_small].reset_index(drop=True)
     st.dataframe(
-        small_parties[display_cols_small].sort_values("PCA_Index").reset_index(drop=True),
+        sorted_small,
         use_container_width=True,
         hide_index=True,
         column_config={
@@ -182,16 +184,10 @@ def _render_suspect_map_or_table(
 
     map_rendered = False
 
-    if geo_df is not None and not geo_df.empty:
-        try:
-            import pydeck as pdk  # noqa: PLC0415
+    try:
+        import pydeck as pdk  # noqa: PLC0415
 
-            # Build a display DataFrame with coordinates
-            # Since Thai names won't match English GeoJSON, use default
-            # Uthai Thani province coordinates (where Ban Rai district is)
-            # as a best-effort centre, and display stations as a table-based
-            # scatter using known coordinates for the district.
-            station_rows = _enrich_suspect_with_coords(suspect_stations, geo_df)
+        station_rows = _enrich_suspect_with_coords(suspect_stations, geo_df)
 
             if not station_rows.empty and "lat" in station_rows.columns:
                 layer = pdk.Layer(
@@ -218,8 +214,8 @@ def _render_suspect_map_or_table(
                     )
                 )
                 map_rendered = True
-        except Exception:  # noqa: BLE001
-            pass  # Fall through to table display
+    except Exception:  # noqa: BLE001
+        pass  # Fall through to table display
 
     if not map_rendered:
         st.info(
@@ -240,39 +236,30 @@ def _render_suspect_map_or_table(
 
 def _enrich_suspect_with_coords(
     suspect_df: pd.DataFrame,
-    geo_df: pd.DataFrame,
+    geo_df: "Optional[pd.DataFrame]",
 ) -> pd.DataFrame:
-    """Join suspect stations with geo coordinates on partial name match.
+    """Assign coordinates to suspect stations using Thai name lookup.
 
-    Uses a simplified approach: for each suspect Tambon, look for a
-    partial string match in the geo_df geo_name column.
+    Uses a hardcoded tambon/amphoe → (lat, lon) table so Thai names resolve
+    correctly without requiring an English GeoJSON match.
+    Adds a small per-row jitter so stations within the same tambon don't stack.
     """
+    import math  # noqa: PLC0415
+    from visualize.data_loader import resolve_thai_coords  # noqa: PLC0415
+
     rows = []
-    for _, row in suspect_df.iterrows():
-        tambon = str(row.get("Tambon", ""))
-        amphoe = str(row.get("Amphoe", ""))
-
-        # Try to find geo_name containing the tambon name
-        match = geo_df[
-            geo_df["geo_name"].str.contains(tambon, na=False, case=False)
-        ]
-        if match.empty:
-            match = geo_df[
-                geo_df["geo_name"].str.contains(amphoe, na=False, case=False)
-            ]
-
-        if not match.empty:
-            lat = match.iloc[0]["lat"]
-            lon = match.iloc[0]["lon"]
-        else:
-            # Default to approximate Thailand centre
-            lat = 15.5
-            lon = 101.0
-
+    for idx, row in enumerate(suspect_df.itertuples(index=False)):
+        tambon = str(getattr(row, "Tambon", ""))
+        amphoe = str(getattr(row, "Amphoe", ""))
+        base_lat, base_lon = resolve_thai_coords(amphoe, tambon)
+        # Spiral jitter so multiple units in the same tambon are visually distinct
+        jitter = 0.008
+        lat = base_lat + jitter * math.sin(idx * 0.7)
+        lon = base_lon + jitter * math.cos(idx * 0.7)
         rows.append({
             "Amphoe": amphoe,
             "Tambon": tambon,
-            "Unit": row.get("Unit", ""),
+            "Unit": getattr(row, "Unit", ""),
             "lat": lat,
             "lon": lon,
         })

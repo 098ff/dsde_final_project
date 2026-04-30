@@ -73,8 +73,10 @@ def render_outliers_tab(merged_df: pd.DataFrame) -> None:
             ["party_name", "district_votes", "list_votes", "ratio", "z_score", "category"]
             if c in outlier_df.columns
         ]
+        sort_col = "z_score" if "z_score" in display_cols else (display_cols[0] if display_cols else None)
+        sorted_df = outlier_df[display_cols].sort_values(sort_col, ascending=False).reset_index(drop=True) if sort_col else outlier_df[display_cols].reset_index(drop=True)
         st.dataframe(
-            outlier_df[display_cols].sort_values("z_score", ascending=False).reset_index(drop=True),
+            sorted_df,
             use_container_width=True,
             hide_index=True,
             column_config={

@@ -66,9 +66,11 @@ def render_loyalty_tab(
     col3.metric(
         "Max Loyalty Ratio",
         f"{ratio_df['ratio'].max():.1%}" if "ratio" in ratio_df.columns else "N/A",
-        delta=ratio_df.loc[ratio_df["ratio"].idxmax(), "tambon"]
-        if "ratio" in ratio_df.columns and "tambon" in ratio_df.columns
-        else "",
+        delta=(
+            ratio_df.loc[ratio_df["ratio"].idxmax(), "tambon"]
+            if "ratio" in ratio_df.columns and "tambon" in ratio_df.columns and ratio_df["ratio"].notna().any()
+            else ""
+        ),
         delta_color="off",
     )
 
@@ -186,52 +188,25 @@ def _enrich_with_coords(
     ratio_df: pd.DataFrame,
     geo_df: Optional[pd.DataFrame],
 ) -> Optional[pd.DataFrame]:
-    """Join ratio data with lat/lon coordinates.
+    """Assign coordinates to tambon rows using Thai name lookup.
 
-    If geo_df is available, attempts partial-name matching on Tambon.
-    If not, uses hardcoded approximate coordinates for Uthai Thani province
-    (where the Ban Rai district data originates) with a small jitter per
-    Tambon index to distinguish points on the map.
+    Uses a hardcoded tambon/amphoe → (lat, lon) table so Thai names resolve
+    correctly without requiring an English GeoJSON match.
     """
+    from visualize.data_loader import resolve_thai_coords  # noqa: PLC0415
+
     enriched = ratio_df.copy().reset_index(drop=True)
 
-    # Approximate centroid for Uthai Thani - Ban Rai district (อ.บ้านไร่)
-    BASE_LAT = 15.0450
-    BASE_LON = 99.5100
+    lats, lons = [], []
+    for _, row in enriched.iterrows():
+        tambon = str(row.get("tambon", ""))
+        amphoe = str(row.get("amphoe", ""))
+        lat, lon = resolve_thai_coords(amphoe, tambon)
+        lats.append(lat)
+        lons.append(lon)
 
-    if geo_df is not None and not geo_df.empty:
-        lats, lons = [], []
-        for _, row in enriched.iterrows():
-            tambon = str(row.get("tambon", ""))
-            amphoe = str(row.get("amphoe", ""))
-            match = geo_df[geo_df["geo_name"].str.contains(tambon, na=False, case=False)]
-            if match.empty:
-                match = geo_df[geo_df["geo_name"].str.contains(amphoe, na=False, case=False)]
-            if not match.empty:
-                lats.append(match.iloc[0]["lat"])
-                lons.append(match.iloc[0]["lon"])
-            else:
-                lats.append(None)
-                lons.append(None)
-        enriched["lat"] = lats
-        enriched["lon"] = lons
-
-        # Fill missing with approximate position
-        enriched["lat"] = enriched["lat"].fillna(BASE_LAT)
-        enriched["lon"] = enriched["lon"].fillna(BASE_LON)
-    else:
-        # Use approximate coordinates with index-based jitter for visual separation
-        n = len(enriched)
-        import math  # noqa: PLC0415
-        enriched["lat"] = [
-            BASE_LAT + 0.05 * math.sin(i * 2 * math.pi / max(n, 1))
-            for i in range(n)
-        ]
-        enriched["lon"] = [
-            BASE_LON + 0.05 * math.cos(i * 2 * math.pi / max(n, 1))
-            for i in range(n)
-        ]
-
+    enriched["lat"] = lats
+    enriched["lon"] = lons
     return enriched
 
 
