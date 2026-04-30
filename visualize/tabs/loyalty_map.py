@@ -159,8 +159,8 @@ def _try_render_pydeck_map(
         )
 
         view_state = pdk.ViewState(
-            latitude=enriched["lat"].mean(),
-            longitude=enriched["lon"].mean(),
+            latitude=15.25,
+            longitude=99.90,
             zoom=9,
             pitch=0,
         )

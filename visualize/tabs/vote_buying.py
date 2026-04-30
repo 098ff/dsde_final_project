@@ -213,9 +213,9 @@ def _render_suspect_map_or_table(
                 pickable=True,
             )
             view_state = pdk.ViewState(
-                latitude=15.5,
-                longitude=101.0,
-                zoom=5,
+                latitude=15.25,
+                longitude=99.90,
+                zoom=9,
                 pitch=0,
             )
             st.pydeck_chart(
