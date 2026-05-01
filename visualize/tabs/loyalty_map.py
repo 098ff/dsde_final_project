@@ -1,11 +1,3 @@
-"""
-Bhumjaithai Loyalty Map tab for the Election Insights dashboard.
-
-Visualises the ratio of Bhumjaithai party votes to total valid ballots
-across Tambons in the dataset, coloured in shades of blue from low (light)
-to high (dark) loyalty.
-"""
-
 from __future__ import annotations
 
 from typing import Optional
