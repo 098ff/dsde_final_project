@@ -1,10 +1,3 @@
-"""
-Outlier Detection tab for the Election Insights dashboard.
-
-Uses Z-score analysis on district-to-party-list vote ratio to identify
-parties with statistically anomalous vote distributions.
-"""
-
 from __future__ import annotations
 
 import pandas as pd

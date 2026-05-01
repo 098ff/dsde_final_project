@@ -1,16 +1,4 @@
-"""
-Vote Buying Detection tab for the Election Insights dashboard.
-
-Insight: When vote buying occurs, voters mark the same party number on both
-the constituency (แบ่งเขต) and party-list (บัญชีรายชื่อ) ballots. This causes
-small/no-name parties to receive unexplained party-list votes. Polling
-stations where any small party exceeded 6.5% of party-list votes are
-flagged as suspicious.
-"""
-
 from __future__ import annotations
-
-from typing import Optional
 
 import pandas as pd
 import streamlit as st
@@ -19,7 +7,6 @@ import streamlit as st
 def render_vote_buying_tab(
     small_df: pd.DataFrame,
     suspect_df: pd.DataFrame,
-    geo_df: Optional[pd.DataFrame],
 ) -> None:
     """Render the Vote Buying Detection tab.
 
@@ -31,9 +18,6 @@ def render_vote_buying_tab(
     suspect_df:
         DataFrame from suspect.csv. Contains 'Amphoe', 'Tambon', 'Unit',
         'Suspect' columns (1.0 = suspicious polling station).
-    geo_df:
-        Optional flat DataFrame with columns (geo_name, lat, lon) from the
-        GeoJSON loader. If None, the map falls back to an interactive table.
     """
 
     st.header("การซื้อเสียง (Vote Buying Detection)")
@@ -168,7 +152,7 @@ def render_vote_buying_tab(
     if suspect_stations.empty:
         st.info("No suspicious stations detected in the dataset.")
     else:
-        _render_suspect_map_or_table(suspect_stations, geo_df)
+        _render_suspect_map_or_table(suspect_stations)
 
     st.divider()
 
@@ -190,10 +174,7 @@ def render_vote_buying_tab(
         )
 
 
-def _render_suspect_map_or_table(
-    suspect_stations: pd.DataFrame,
-    geo_df: Optional[pd.DataFrame],
-) -> None:
+def _render_suspect_map_or_table(suspect_stations: pd.DataFrame) -> None:
     """Attempt to render a pydeck map; fall back to interactive table."""
 
     map_rendered = False
@@ -201,7 +182,7 @@ def _render_suspect_map_or_table(
     try:
         import pydeck as pdk  # noqa: PLC0415
 
-        station_rows = _enrich_suspect_with_coords(suspect_stations, geo_df)
+        station_rows = _enrich_suspect_with_coords(suspect_stations)
 
         if not station_rows.empty and "lat" in station_rows.columns:
             with st.expander("Map view state tuner (copy values to code when done)", expanded=False):
@@ -255,10 +236,7 @@ def _render_suspect_map_or_table(
         )
 
 
-def _enrich_suspect_with_coords(
-    suspect_df: pd.DataFrame,
-    geo_df: "Optional[pd.DataFrame]",
-) -> pd.DataFrame:
+def _enrich_suspect_with_coords(suspect_df: pd.DataFrame) -> pd.DataFrame:
     """Assign coordinates to suspect stations using Thai name lookup.
 
     Uses a hardcoded tambon/amphoe → (lat, lon) table so Thai names resolve

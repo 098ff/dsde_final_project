@@ -14,10 +14,7 @@ import pandas as pd
 import streamlit as st
 
 
-def render_loyalty_tab(
-    ratio_df: pd.DataFrame,
-    geo_df: Optional[pd.DataFrame],
-) -> None:
+def render_loyalty_tab(ratio_df: pd.DataFrame) -> None:
     """Render the Bhumjaithai Loyalty Map tab.
 
     Parameters
@@ -25,10 +22,6 @@ def render_loyalty_tab(
     ratio_df:
         DataFrame from all_districts_bhumjaithai_ratio.csv. Expected columns:
         amphoe, tambon, bhumjaithai_votes, total_valid_ballots, ratio.
-    geo_df:
-        Optional flat DataFrame with (geo_name, lat, lon) from the GeoJSON
-        loader. Used for choropleth-style map rendering. Falls back to a
-        bar chart if not available.
     """
 
     st.header("Bhumjaithai Loyalty Map (แผนที่ความจงรักภักดีของพรรคภูมิใจไทย)")
@@ -78,7 +71,7 @@ def render_loyalty_tab(
 
     # ── Map or bar chart ─────────────────────────────────────────────────────
 
-    map_rendered = _try_render_pydeck_map(ratio_df, geo_df)
+    map_rendered = _try_render_pydeck_map(ratio_df)
 
     if not map_rendered:
         _render_bar_chart_fallback(ratio_df)
@@ -115,7 +108,6 @@ def render_loyalty_tab(
 
 def _try_render_pydeck_map(
     ratio_df: pd.DataFrame,
-    geo_df: Optional[pd.DataFrame],
 ) -> bool:
     """Attempt to render a pydeck choropleth/scatter map coloured by ratio.
 
@@ -125,7 +117,7 @@ def _try_render_pydeck_map(
         import pydeck as pdk  # noqa: PLC0415
 
         # Enrich ratio_df with coordinates
-        enriched = _enrich_with_coords(ratio_df, geo_df)
+        enriched = _enrich_with_coords(ratio_df)
 
         if enriched is None or enriched.empty or "lat" not in enriched.columns:
             return False
@@ -193,10 +185,7 @@ def _try_render_pydeck_map(
         return False
 
 
-def _enrich_with_coords(
-    ratio_df: pd.DataFrame,
-    geo_df: Optional[pd.DataFrame],
-) -> Optional[pd.DataFrame]:
+def _enrich_with_coords(ratio_df: pd.DataFrame) -> Optional[pd.DataFrame]:
     """Assign coordinates to tambon rows using Thai name lookup.
 
     Uses a hardcoded tambon/amphoe → (lat, lon) table so Thai names resolve

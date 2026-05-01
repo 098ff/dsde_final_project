@@ -31,7 +31,6 @@ st.set_page_config(
 
 from data_loader import (  # noqa: E402
     load_bhumjaithai_ratio,
-    load_geo_dataframe,
     load_merged_parties,
     load_small_party,
     load_suspect,
@@ -48,7 +47,6 @@ small_df = load_small_party()
 suspect_df = load_suspect()
 merged_df = load_merged_parties()
 ratio_df = load_bhumjaithai_ratio()
-geo_df = load_geo_dataframe()
 
 # ---------------------------------------------------------------------------
 # App header
@@ -77,10 +75,10 @@ tab_vote, tab_outlier, tab_loyalty = st.tabs(
 )
 
 with tab_vote:
-    render_vote_buying_tab(small_df, suspect_df, geo_df)
+    render_vote_buying_tab(small_df, suspect_df)
 
 with tab_outlier:
     render_outliers_tab(merged_df)
 
 with tab_loyalty:
-    render_loyalty_tab(ratio_df, geo_df)
+    render_loyalty_tab(ratio_df)
