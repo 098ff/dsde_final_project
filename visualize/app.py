@@ -54,10 +54,10 @@ geo_df = load_geo_dataframe()
 # App header
 # ---------------------------------------------------------------------------
 
-st.title("Thai Election 2023 — Insights Dashboard")
+st.title("Thai Election 2026 — Insights Dashboard")
 st.markdown(
     """
-    **Data source:** OCR-validated ballot data from the 2023 Thai general election.
+    **Data source:** OCR-validated ballot data from the 2026 Thai general election.
     This dashboard presents three analytical insights derived from the validation pipeline.
     """
 )
