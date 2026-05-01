@@ -149,20 +149,29 @@ def _try_render_pydeck_map(
         enriched["colour_b"] = enriched["colour"].apply(lambda c: c[2])
         enriched["ratio_pct"] = enriched["ratio"].apply(lambda r: f"{r:.1%}")
 
+        with st.expander("Map view state tuner (copy values to code when done)", expanded=False):
+            _c1, _c2 = st.columns(2)
+            _lat    = _c1.number_input("latitude",            value=15.30,  step=0.01,  format="%.4f", key="lmap_lat")
+            _lon    = _c2.number_input("longitude",           value=99.55,  step=0.01,  format="%.4f", key="lmap_lon")
+            _zoom   = _c1.number_input("zoom",                value=9,      step=1,                    key="lmap_zoom")
+            _pitch  = _c2.number_input("pitch",               value=0,      step=5,                    key="lmap_pitch")
+            _radius = st.number_input( "get_radius (metres)", value=2000,   step=100,                  key="lmap_radius")
+            st.code(f"latitude={_lat}, longitude={_lon}, zoom={_zoom}, pitch={_pitch}, get_radius={_radius}")
+
         layer = pdk.Layer(
             "ScatterplotLayer",
             data=enriched,
             get_position="[lon, lat]",
             get_color="[colour_r, colour_g, colour_b, 200]",
-            get_radius=4000,
+            get_radius=_radius,
             pickable=True,
         )
 
         view_state = pdk.ViewState(
-            latitude=15.25,
-            longitude=99.90,
-            zoom=9,
-            pitch=0,
+            latitude=_lat,
+            longitude=_lon,
+            zoom=_zoom,
+            pitch=_pitch,
         )
 
         st.pydeck_chart(
