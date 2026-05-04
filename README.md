@@ -30,8 +30,8 @@ discover_units          ← finds all (tambon/unit) folders
 process_unit ×N         ← parallel OCR + ElectionValidator per unit
     │                      max 5 concurrent (or 1 in RATE_LIMIT mode)
     ▼
-aggregate_summaries     ← flattens logs, runs structural audit,
-(master_summary_log.csv)   stamps flag_missing_counterpart on every row
+aggregate_summaries     ← flattens logs
+(master_summary_log.csv)
 ```
 
 ### Components
@@ -56,14 +56,9 @@ All flags appear as columns in `master_summary_log.csv`.
 | `flag_missing_data` | Score or ballot field could not be parsed (`NaN`) | Verify OCR source image |
 | `flag_linguistic_mismatch` | OCR score cell has conflicting digit and Thai word | Re-read score cell manually |
 | `flag_ocr_timeout` | OCR API timed out after all retries for some pages/chunks | Review attached image / missing data |
-| `flag_missing_counterpart` | Station is missing its paired form type | Locate and re-scan missing form |
 | `needs_manual_check` | Any of the 6 per-unit flags above is `True` | Human-in-the-loop verification |
 
-> **`flag_missing_data` vs `flag_missing_counterpart`** — these are not the same:
-> - `flag_missing_data` — the form **exists** but a score or ballot field could not be read (OCR returned NaN). Action: verify the numbers on the physical form.
-> - `flag_missing_counterpart` — an entire form type for a station is **absent** (e.g. station has บัญชีรายชื่อ but no แบ่งเขต). Action: locate and re-scan the missing form.
->
-> `needs_manual_check` covers the first 6 per-unit flags. `flag_missing_counterpart` is set separately during aggregation and does **not** affect `needs_manual_check`.
+> `needs_manual_check` covers the first 6 per-unit flags.
 
 ---
 
@@ -138,7 +133,6 @@ Login: `admin` / `admin`
 | `master_summary_log.csv` | `output_data/` | One row per processed form — all flags included |
 | `visualize_flags.ipynb` | `output_data/` | Notebook for flag visualisation and human review queue |
 
-> `missing_units.csv` is no longer produced. Missing counterpart forms are flagged inline via `flag_missing_counterpart` in `master_summary_log.csv`.
 
 ### 6. Stop Airflow
 
@@ -173,7 +167,6 @@ The `validation/` package can be used independently of Airflow:
 
 ```python
 from validation.engine import ElectionValidator
-from validation.structural_auditor import audit_units, generate_missing_report
 from validation.linguistic_validator import clean_score_to_int, thai_word_to_int
 from validation.formatters import prepare_df_for_csv
 
@@ -181,9 +174,6 @@ from validation.formatters import prepare_df_for_csv
 validator = ElectionValidator(master_candidates=MASTER_CANDIDATES, master_parties=MASTER_PARTIES)
 cleaned_data, flags = validator.validate(parsed_data)
 
-# Audit a batch for missing forms
-missing = audit_units(records)   # records = [{"Tambon": ..., "Unit": ..., "form_type": ...}]
-generate_missing_report(missing, "output_data/missing_units.csv")
 ```
 
 Run tests:

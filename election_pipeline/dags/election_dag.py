@@ -20,13 +20,7 @@ from src.ocr_parser import ElectionOCRParser
 from src.exporter import export_individual_result
 from src.config import MASTER_PARTIES, MASTER_CANDIDATES, GDRIVE_ROOT_FOLDER_ID
 
-from validation.structural_auditor import audit_units
-from validation.form_identifier import FORM_CONSTITUENCY, FORM_PARTY_LIST
 
-_TYPE_MAP = {
-    "บัญชีรายชื่อ": FORM_PARTY_LIST,
-    "แบ่งเขต":      FORM_CONSTITUENCY,
-}
 
 @dag(
     schedule_interval=None,
