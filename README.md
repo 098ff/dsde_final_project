@@ -186,4 +186,6 @@ cd election_pipeline && uv run pytest validation/tests/
 ## Contributors
 
 - **Chanatda Konchom** (6631305321)
+- **Chatrin Yoonchalard** (6631304721) - Validation Pipeline, Visualization 
+- **Rinlada Rojchanapakul** - OCR Quality Assurance
 - Course: 2110446 Data Science and Data Engineering, Chulalongkorn University
