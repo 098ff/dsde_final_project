@@ -170,28 +170,8 @@ flowchart TD
 
 > **เหตุผล**: เอกสาร กกต. มักมีทั้งตัวเลขและตัวอักษร (เช่น "177 (หนึ่งร้อยเจ็ดสิบเจ็ด)") — ถ้าทั้ง 2 อ่านได้แต่ไม่ตรงกัน แสดงว่า OCR ผิดอย่างน้อย 1 ตัว
 
-### 4.3 `validation/form_identifier.py` — Form Type Classifier
 
-| Pattern | Match | Type |
-|---|---|---|
-| `ส.ส.\s*5\s*/\s*(11\|18)\s*\(บช\)` | `ส.ส. 5/18 (บช)` | **Party List** |
-| `ส.ส.\s*5\s*/\s*(11\|18)(?!\s*\(บช\))` | `ส.ส. 5/18` | **Constituency** |
-| (ไม่ match) | — | **Unknown** |
-
-> **เหตุผล**: Party List regex ต้องเช็คก่อน (specific กว่า) เพราะ Constituency pattern จะ match text ที่มี (บช) ด้วยถ้าไม่มี negative lookahead
-
-### 4.4 `validation/structural_auditor.py` — Completeness Checker
-
-> ตรวจสอบว่าผลลัพธ์จาก OCR ของแต่ละหน่วยเลือกตั้งนั้น มีทั้ง **ฟอร์มบัญชีรายชื่อ (Party List)** และ **ฟอร์มแบ่งเขต (Constituency)** ครบทั้งคู่หรือไม่ — ถ้าขาดฟอร์มใดฟอร์มหนึ่งจะถูก flag ไว้
-
-| Function | Input | Output |
-|---|---|---|
-| `audit_units(records)` | List of `{Tambon, Unit, form_type}` | List of `{Tambon, Unit, missing_form}` |
-| `generate_missing_report(items, path)` | missing items + output path | CSV file |
-
-**Logic**: ทุก (Tambon, Unit) ต้องมีทั้ง Constituency **และ** Party List — ถ้าขาดจะถูก report
-
-### 4.5 `validation/tests/formatters.py` — Serialization Helpers (Test-Only Utility)
+### 4.3 `validation/tests/formatters.py` — Serialization Helpers (Test-Only Utility)
 
 > [!NOTE]
 > ไฟล์นี้ **ไม่ได้ถูกใช้ใน pipeline จริง** — ถูก import เฉพาะใน `test_jigsaw.py` เท่านั้น ใช้สำหรับ research/testing ตอนพัฒนา เพื่อดูว่า NaN ถูก serialize อย่างไรในแต่ละ format
@@ -412,7 +392,6 @@ flowchart TD
 |---|---|
 | `test_jigsaw.py` | `clean_score_to_int` NaN, math flags, name mismatch, formatters, integration |
 | `test_linguistic_validator.py` | 8 dimensions: numeric accuracy, linguistic, mismatch detection, normalization, error propagation, backward compat, structural consistency, pipeline integration |
-| `test_structural.py` | `identify_form_type` (10 cases), `audit_units` (6 cases), `generate_missing_report` (2 cases) |
 | `test_integration.py` | Parser↔Validator wiring, NaN delegation, end-to-end parse→validate |
 
 ---
@@ -437,7 +416,6 @@ flowchart LR
 | **Parse** | `ocr_parser.py` | Regex, HTML/Markdown table parsing |
 | **Validate** | `engine.py` | thefuzz (fuzzy match), numpy NaN |
 | **Cross-check** | `linguistic_validator.py` | PyThaiNLP `thaiword_to_num` |
-| **Audit** | `structural_auditor.py` | Set-based completeness check |
 | **Export** | `exporter.py` | Pandas `json_normalize`, CSV/JSON |
 | **Orchestrate** | `election_dag.py` | Airflow 2.8, Dynamic Task Mapping |
 | **Review** | `streamlit_manual_review.py` | Streamlit, Plotly/Altair |

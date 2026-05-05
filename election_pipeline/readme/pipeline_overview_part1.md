@@ -35,8 +35,6 @@ flowchart LR
         direction TB
         ENG["engine.py<br/>ElectionValidator"]
         LING["linguistic_validator.py"]
-        FORM["form_identifier.py"]
-        STRUCT["structural_auditor.py"]
     end
 
     subgraph OUT["📊 Output & Review"]
@@ -109,8 +107,6 @@ election_pipeline/
 ├── validation/                   # Quality assurance module
 │   ├── engine.py                 # Jigsaw Validator (fuzzy match + flags)
 │   ├── linguistic_validator.py   # Thai numeral ↔ word cross-check
-│   ├── form_identifier.py        # Regex-based form type classifier
-│   ├── structural_auditor.py     # Completeness checker
 │   ├── notebooks/
 │   │   ├── manual_review_queue.ipynb   # Jupyter manual correction
 │   │   └── streamlit_manual_review.py  # Streamlit review dashboard
@@ -118,7 +114,6 @@ election_pipeline/
 │       ├── formatters.py         # NaN serialization helpers (test-only)
 │       ├── test_jigsaw.py
 │       ├── test_linguistic_validator.py
-│       ├── test_structural.py
 │       └── test_integration.py
 │
 ├── output_data/                  # Pipeline output (auto-created)
