@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
+
+_DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 def render_vote_buying_tab(
@@ -68,6 +72,17 @@ def render_vote_buying_tab(
 
     st.divider()
 
+    # ── PCA Index & K-Means Cluster chart ───────────────────────────────────
+
+    st.subheader("การแบ่งกลุ่มพรรคการเมือง (PCA Index & K-Means Clusters)")
+    st.caption(
+        "All parties sorted by PCA Index (Prominence Index). "
+        "Colors indicate K-Means cluster assignment."
+    )
+    _render_pca_cluster_chart(small_df)
+
+    st.divider()
+
     # ── Small party table ────────────────────────────────────────────────────
 
     st.subheader("Small / No-Name Parties")
@@ -102,42 +117,55 @@ def render_vote_buying_tab(
         if sort_col
         else small_parties[display_cols_small].reset_index(drop=True)
     )
-    st.dataframe(
-        sorted_small,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Party": st.column_config.TextColumn("Party Name (พรรค)"),
-            "PCA_Index": st.column_config.NumberColumn(
-                "PCA Index",
-                format="%.3f",
-                help="Lower = more 'small-party' characteristics",
-            ),
-            "sent_pm_district_ratio": st.column_config.NumberColumn(
-                "District MP Ratio", format="%.3f"
-            ),
-            "sent_pm_partylist_ratio": st.column_config.NumberColumn(
-                "Party-List MP Ratio", format="%.3f"
-            ),
-            "social_media_followers_scaled": st.column_config.NumberColumn(
-                "Social Media (scaled)", format="%.3f"
-            ),
-            "branch_scaled": st.column_config.NumberColumn(
-                "Branches (scaled)", format="%.3f"
-            ),
-            "representative_scaled": st.column_config.NumberColumn(
-                "Representatives (scaled)", format="%.3f"
-            ),
-            "member_scaled": st.column_config.NumberColumn(
-                "Members (scaled)", format="%.3f"
-            ),
-            "trends_scaled": st.column_config.NumberColumn(
-                "Google Trends (scaled)", format="%.3f"
-            ),
-            "past_pm": st.column_config.NumberColumn("Past Seats (binary)"),
-            "KMeans_Cluster": st.column_config.NumberColumn("KMeans Cluster"),
-        },
+    with st.expander(f"Small / No-Name Party Table ({len(small_parties)} parties)", expanded=False):
+        st.dataframe(
+            sorted_small,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Party": st.column_config.TextColumn("Party Name (พรรค)"),
+                "PCA_Index": st.column_config.NumberColumn(
+                    "PCA Index",
+                    format="%.3f",
+                    help="Lower = more 'small-party' characteristics",
+                ),
+                "sent_pm_district_ratio": st.column_config.NumberColumn(
+                    "District MP Ratio", format="%.3f"
+                ),
+                "sent_pm_partylist_ratio": st.column_config.NumberColumn(
+                    "Party-List MP Ratio", format="%.3f"
+                ),
+                "social_media_followers_scaled": st.column_config.NumberColumn(
+                    "Social Media (scaled)", format="%.3f"
+                ),
+                "branch_scaled": st.column_config.NumberColumn(
+                    "Branches (scaled)", format="%.3f"
+                ),
+                "representative_scaled": st.column_config.NumberColumn(
+                    "Representatives (scaled)", format="%.3f"
+                ),
+                "member_scaled": st.column_config.NumberColumn(
+                    "Members (scaled)", format="%.3f"
+                ),
+                "trends_scaled": st.column_config.NumberColumn(
+                    "Google Trends (scaled)", format="%.3f"
+                ),
+                "past_pm": st.column_config.NumberColumn("Past Seats (binary)"),
+                "KMeans_Cluster": st.column_config.NumberColumn("KMeans Cluster"),
+            },
+        )
+
+    st.divider()
+
+    # ── PCA Feature Weights chart ────────────────────────────────────────────
+
+    st.subheader("PCA Feature Weights")
+    st.caption(
+        "The 8 party-size features are Min-Max scaled and compressed to a single "
+        "**PCA Index** via Principal Component Analysis. The chart below shows each "
+        "feature's contribution (%) to the first principal component."
     )
+    _render_pca_weights(small_df)
 
     st.divider()
 
@@ -174,6 +202,134 @@ def render_vote_buying_tab(
         )
 
 
+def _render_pca_cluster_chart(small_df: pd.DataFrame) -> None:
+    """Render a bar chart of PCA Index per party, coloured by KMeans cluster."""
+    if small_df.empty:
+        st.info("No data available for PCA cluster chart.")
+        return
+
+    needed = {"Party", "PCA_Index", "KMeans_Cluster"}
+    if not needed.issubset(small_df.columns):
+        st.info("PCA_Index or KMeans_Cluster columns not found in data.")
+        return
+
+    try:
+        import altair as alt  # noqa: PLC0415
+
+        chart_df = (
+            small_df[["Party", "PCA_Index", "KMeans_Cluster"]]
+            .dropna(subset=["PCA_Index", "KMeans_Cluster"])
+            .copy()
+        )
+        chart_df["KMeans_Cluster"] = chart_df["KMeans_Cluster"].astype(int).astype(str)
+        chart_df = chart_df.sort_values("PCA_Index", ascending=False).reset_index(drop=True)
+
+        party_order = chart_df["Party"].tolist()
+
+        chart = (
+            alt.Chart(chart_df)
+            .mark_bar()
+            .encode(
+                x=alt.X(
+                    "Party:N",
+                    sort=party_order,
+                    title="Party",
+                    axis=alt.Axis(labelAngle=-90, labelFontSize=10),
+                ),
+                y=alt.Y("PCA_Index:Q", title="Prominence Index"),
+                color=alt.Color(
+                    "KMeans_Cluster:N",
+                    scale=alt.Scale(
+                        domain=["0", "1", "2"],
+                        range=["#440154", "#31878E", "#D4C03A"],
+                    ),
+                    legend=alt.Legend(title="KMeans_Cluster"),
+                ),
+                tooltip=["Party:N", alt.Tooltip("PCA_Index:Q", format=".3f"), "KMeans_Cluster:N"],
+            )
+            .properties(
+                title="การแบ่งกลุ่มพรรคการเมือง (PCA Index & K-Means Clusters)",
+                height=400,
+            )
+        )
+        st.altair_chart(chart, use_container_width=True)
+    except ImportError:
+        st.info("Install altair to view the PCA cluster chart.")
+    except Exception as exc:  # noqa: BLE001
+        st.info(f"Could not render PCA cluster chart: {exc}")
+
+
+def _render_pca_weights(small_df: pd.DataFrame) -> None:
+    """Render PCA feature weights as a live horizontal bar chart."""
+    if small_df.empty:
+        st.info("PCA feature weights chart unavailable — pca_feature_weights.png not found.")
+        return
+
+    features = [
+        "sent_pm_district_ratio",
+        "sent_pm_partylist_ratio",
+        "social_media_followers_scaled",
+        "branch_scaled",
+        "representative_scaled",
+        "member_scaled",
+        "trends_scaled",
+        "past_pm",
+    ]
+    feature_labels = [
+        "MP District Send Ratio",
+        "Party-List Send Ratio",
+        "Facebook Followers",
+        "Party Branches",
+        "Representatives",
+        "Members",
+        "Google Trends",
+        "Past PM Experience",
+    ]
+    avail = [f for f in features if f in small_df.columns]
+    if not avail:
+        st.info("PCA feature columns not found in data.")
+        return
+
+    try:
+        import numpy as np  # noqa: PLC0415
+        from sklearn.decomposition import PCA  # noqa: PLC0415
+
+        X = small_df[avail].fillna(0).values
+        pca = PCA(n_components=1)
+        pca.fit(X)
+        weights = abs(pca.components_[0])
+        contrib = weights / weights.sum() * 100
+        labels = [feature_labels[features.index(f)] for f in avail]
+
+        chart_data = pd.DataFrame(
+            {"Feature": labels, "Contribution (%)": contrib}
+        ).sort_values("Contribution (%)", ascending=False)
+
+        try:
+            import altair as alt  # noqa: PLC0415
+
+            chart = (
+                alt.Chart(chart_data)
+                .mark_bar()
+                .encode(
+                    x=alt.X("Contribution (%):Q", title="Contribution (%)"),
+                    y=alt.Y("Feature:N", sort="-x", title="Feature"),
+                    color=alt.Color(
+                        "Contribution (%):Q",
+                        scale=alt.Scale(scheme="viridis"),
+                        legend=None,
+                    ),
+                    tooltip=["Feature:N", alt.Tooltip("Contribution (%):Q", format=".1f")],
+                )
+                .properties(title="PCA Feature Contributions to 'Small Party' Index", height=280)
+            )
+            st.altair_chart(chart, use_container_width=True)
+        except ImportError:
+            st.bar_chart(chart_data.set_index("Feature")["Contribution (%)"])
+    except Exception as exc:  # noqa: BLE001
+        st.info(f"Could not render live PCA chart: {exc}")
+
+
 def _render_suspect_map_or_table(suspect_stations: pd.DataFrame) -> None:
     """Attempt to render a pydeck map; fall back to interactive table."""
 
@@ -185,7 +341,7 @@ def _render_suspect_map_or_table(suspect_stations: pd.DataFrame) -> None:
         station_rows = _enrich_suspect_with_coords(suspect_stations)
 
         if not station_rows.empty and "lat" in station_rows.columns:
-            with st.expander("Map view state tuner (copy values to code when done)", expanded=False):
+            with st.expander("Map view state tuner", expanded=False):
                 _c1, _c2 = st.columns(2)
                 _lat    = _c1.number_input("latitude",            value=15.30,  step=0.01,  format="%.4f", key="vmap_lat")
                 _lon    = _c2.number_input("longitude",           value=99.55,  step=0.01,  format="%.4f", key="vmap_lon")
