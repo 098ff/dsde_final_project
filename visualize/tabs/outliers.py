@@ -135,6 +135,20 @@ def render_outliers_tab(merged_df: pd.DataFrame) -> None:
         )
 
 
+def _find_thai_font():
+    """Return a FontProperties for a Thai-capable font, or None if unavailable."""
+    try:
+        from matplotlib import font_manager as fm  # noqa: PLC0415
+        available = {f.name for f in fm.fontManager.ttflist}
+        for name in ["Noto Sans Thai", "Garuda", "Loma", "Kinnari", "TH Sarabun New",
+                     "Noto Sans", "Sarabun"]:
+            if name in available:
+                return fm.FontProperties(family=name), name
+    except Exception:  # noqa: BLE001
+        pass
+    return None, None
+
+
 def _render_bell_curve(merged_df: pd.DataFrame) -> None:
     """Render Z-score bell curve distribution mirroring insight2_zscore_distribution.ipynb."""
     if "z_score" not in merged_df.columns:
@@ -149,6 +163,8 @@ def _render_bell_curve(merged_df: pd.DataFrame) -> None:
         import matplotlib.pyplot as plt  # noqa: PLC0415
         import seaborn as sns  # noqa: PLC0415
         from scipy.stats import norm  # noqa: PLC0415
+
+        thai_prop, thai_name = _find_thai_font()
 
         fig, ax = plt.subplots(figsize=(12, 6))
         fig.patch.set_facecolor("#0e1117")
@@ -185,24 +201,36 @@ def _render_bell_curve(merged_df: pd.DataFrame) -> None:
                 )
             ]
             seen_x: list[float] = []
+
+            # Fix y-axis before annotations so bounding boxes don't distort the curve
+            y_top = norm.pdf(0, 0, 1) * 1.5
+            ax.set_ylim(0, y_top)
+
             for _, row in outliers.iterrows():
                 z = float(row["z_score"])
-                name = str(row["party_name"]).split("-")[-1].strip()
-                # Stack annotations vertically if x positions are close
-                offset = 0.18 + 0.06 * sum(1 for sx in seen_x if abs(sx - z) < 0.8)
-                ax.annotate(
-                    name,
+                raw_name = str(row["party_name"]).split("-")[-1].strip()
+                # Fall back to ASCII label when no Thai font is available
+                label = raw_name if thai_prop is not None else f"z={z:.2f}"
+                offset = min(
+                    0.18 + 0.06 * sum(1 for sx in seen_x if abs(sx - z) < 0.8),
+                    y_top * 0.85,
+                )
+                annot_kwargs: dict = dict(
                     xy=(z, 0.04),
                     xytext=(z, offset),
                     arrowprops=dict(facecolor="red", shrink=0.05, width=1, headwidth=5),
                     fontsize=9,
                     color="#ff6b6b",
                     ha="center",
+                    annotation_clip=False,
                 )
+                if thai_prop is not None:
+                    annot_kwargs["fontproperties"] = thai_prop
+                ax.annotate(label, **annot_kwargs)
                 seen_x.append(z)
 
         ax.set_title(
-            "Distribution of Party Votes Ratio Z-Scores (กราฟระฆังคว่ำ)",
+            "Distribution of Party Votes Ratio Z-Scores",
             fontsize=14, color="white",
         )
         ax.set_xlabel("Z-Score", fontsize=12, color="white")
