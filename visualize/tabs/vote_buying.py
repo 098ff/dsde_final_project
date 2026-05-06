@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
+
+_DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 def render_vote_buying_tab(
@@ -141,6 +145,18 @@ def render_vote_buying_tab(
 
     st.divider()
 
+    # ── PCA Feature Weights chart ────────────────────────────────────────────
+
+    st.subheader("PCA Feature Weights — How the 'Small Party' Score is Computed")
+    st.caption(
+        "The 8 party-size features are Min-Max scaled and compressed to a single "
+        "**PCA Index** via Principal Component Analysis. The chart below shows each "
+        "feature's contribution (%) to the first principal component."
+    )
+    _render_pca_weights(small_df)
+
+    st.divider()
+
     # ── Suspect stations map / table ─────────────────────────────────────────
 
     st.subheader("Suspicious Polling Stations (หน่วยเลือกตั้งที่น่าสงสัย)")
@@ -172,6 +188,87 @@ def render_vote_buying_tab(
                 ),
             },
         )
+
+
+def _render_pca_weights(small_df: pd.DataFrame) -> None:
+    """Render PCA feature weights — static image from insights or live Altair chart."""
+    _img = _DATA_DIR / "pca_feature_weights.png"
+    if _img.exists():
+        st.image(
+            str(_img),
+            caption="PCA Feature Contributions to 'Small Party' Index (from insight1_pca_features.ipynb)",
+            use_container_width=True,
+        )
+        return
+
+    # Live fallback: recompute loadings from small_party.csv
+    if small_df.empty:
+        st.info("PCA feature weights chart unavailable — pca_feature_weights.png not found.")
+        return
+
+    features = [
+        "sent_pm_district_ratio",
+        "sent_pm_partylist_ratio",
+        "social_media_followers_scaled",
+        "branch_scaled",
+        "representative_scaled",
+        "member_scaled",
+        "trends_scaled",
+        "past_pm",
+    ]
+    feature_labels = [
+        "MP District Send Ratio",
+        "Party-List Send Ratio",
+        "Facebook Followers",
+        "Party Branches",
+        "Representatives",
+        "Members",
+        "Google Trends",
+        "Past PM Experience",
+    ]
+    avail = [f for f in features if f in small_df.columns]
+    if not avail:
+        st.info("PCA feature columns not found in data.")
+        return
+
+    try:
+        import numpy as np  # noqa: PLC0415
+        from sklearn.decomposition import PCA  # noqa: PLC0415
+
+        X = small_df[avail].fillna(0).values
+        pca = PCA(n_components=1)
+        pca.fit(X)
+        weights = abs(pca.components_[0])
+        contrib = weights / weights.sum() * 100
+        labels = [feature_labels[features.index(f)] for f in avail]
+
+        chart_data = pd.DataFrame(
+            {"Feature": labels, "Contribution (%)": contrib}
+        ).sort_values("Contribution (%)", ascending=False)
+
+        try:
+            import altair as alt  # noqa: PLC0415
+
+            chart = (
+                alt.Chart(chart_data)
+                .mark_bar()
+                .encode(
+                    x=alt.X("Contribution (%):Q", title="Contribution (%)"),
+                    y=alt.Y("Feature:N", sort="-x", title="Feature"),
+                    color=alt.Color(
+                        "Contribution (%):Q",
+                        scale=alt.Scale(scheme="viridis"),
+                        legend=None,
+                    ),
+                    tooltip=["Feature:N", alt.Tooltip("Contribution (%):Q", format=".1f")],
+                )
+                .properties(title="PCA Feature Contributions to 'Small Party' Index", height=280)
+            )
+            st.altair_chart(chart, use_container_width=True)
+        except ImportError:
+            st.bar_chart(chart_data.set_index("Feature")["Contribution (%)"])
+    except Exception as exc:  # noqa: BLE001
+        st.info(f"Could not render live PCA chart: {exc}")
 
 
 def _render_suspect_map_or_table(suspect_stations: pd.DataFrame) -> None:

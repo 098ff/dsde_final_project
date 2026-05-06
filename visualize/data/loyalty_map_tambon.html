@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_1be5c4bd74d9276138bfdc3f236a375f {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_1be5c4bd74d9276138bfdc3f236a375f" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_1be5c4bd74d9276138bfdc3f236a375f = L.map(
+                "map_1be5c4bd74d9276138bfdc3f236a375f",
+                {
+                    center: [15.3, 99.55],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 10,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_c877706c001615560a7b72e00f297756 = L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors \u0026copy; \u003ca href=\"https://carto.com/attributions\"\u003eCARTO\u003c/a\u003e",
+  "subdomains": "abcd",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_c877706c001615560a7b72e00f297756.addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            var circle_17b3f08d514268dbf177935f1b94511f = L.circle(
+                [15.3406, 99.4795],
+                {"bubblingMouseEvents": true, "color": "#2d7dbb", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#2d7dbb", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_17b3f08d514268dbf177935f1b94511f.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอห้วยคต<br>
+    <b>Tambon:</b> ตำบลทองหลาง<br>
+    <b>Loyalty Ratio:</b> 35.2%<br>
+    <b>Votes:</b> 1169.0 / 3320.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_1949551a400e3a866da336bc1d3dac7e = L.circle(
+                [15.259899, 99.578475],
+                {"bubblingMouseEvents": true, "color": "#135fa7", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#135fa7", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_1949551a400e3a866da336bc1d3dac7e.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอห้วยคต<br>
+    <b>Tambon:</b> ตำบลห้วยคต<br>
+    <b>Loyalty Ratio:</b> 45.0%<br>
+    <b>Votes:</b> 687.0 / 1528.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_d6ad097bdaed13a6c61bfe2148b572e8 = L.circle(
+                [15.28018, 99.645271],
+                {"bubblingMouseEvents": true, "color": "#b7d4ea", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#b7d4ea", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_d6ad097bdaed13a6c61bfe2148b572e8.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอห้วยคต<br>
+    <b>Tambon:</b> ตำบลสุขฤทัย<br>
+    <b>Loyalty Ratio:</b> 0.0%<br>
+    <b>Votes:</b> 0.0 / 0.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_5787236ba6980f0f3d8eb9d5009d457c = L.circle(
+                [15.32553, 99.667549],
+                {"bubblingMouseEvents": true, "color": "#1d6cb1", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#1d6cb1", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_5787236ba6980f0f3d8eb9d5009d457c.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอหนองฉาง<br>
+    <b>Tambon:</b> ตำบลเขาบางแกรก<br>
+    <b>Loyalty Ratio:</b> 40.5%<br>
+    <b>Votes:</b> 1088.0 / 2689.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_58d7284abc5838030508c22b60ef7b75 = L.circle(
+                [15.367956, 99.756716],
+                {"bubblingMouseEvents": true, "color": "#1a68ae", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#1a68ae", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_58d7284abc5838030508c22b60ef7b75.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอหนองฉาง<br>
+    <b>Tambon:</b> ตำบลทุ่งโพ<br>
+    <b>Loyalty Ratio:</b> 41.8%<br>
+    <b>Votes:</b> 1425.0 / 3412.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_0a3d98b5505879d9e4e1e58acd0016a9 = L.circle(
+                [15.394052, 99.689832],
+                {"bubblingMouseEvents": true, "color": "#2272b6", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#2272b6", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_0a3d98b5505879d9e4e1e58acd0016a9.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอหนองฉาง<br>
+    <b>Tambon:</b> ตำบลเขากวางทอง<br>
+    <b>Loyalty Ratio:</b> 38.4%<br>
+    <b>Votes:</b> 1203.0 / 3133.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_8ead13fd8b0d9cfa23e606180c91a002 = L.circle(
+                [15.374756, 99.600735],
+                {"bubblingMouseEvents": true, "color": "#1c6ab0", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#1c6ab0", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_8ead13fd8b0d9cfa23e606180c91a002.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอลานสัก<br>
+    <b>Tambon:</b> ตำบลทุ่งนางาม<br>
+    <b>Loyalty Ratio:</b> 41.1%<br>
+    <b>Votes:</b> 1260.0 / 3063.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_0183740dd7d74c5c335a5c9d080480f2 = L.circle(
+                [15.401764, 99.511733],
+                {"bubblingMouseEvents": true, "color": "#08478d", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#08478d", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_0183740dd7d74c5c335a5c9d080480f2.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอลานสัก<br>
+    <b>Tambon:</b> ตำบลป่าอ้อ<br>
+    <b>Loyalty Ratio:</b> 53.1%<br>
+    <b>Votes:</b> 1624.0 / 3059.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_72ed3698a974712c19ac4027c45cfcd6 = L.circle(
+                [15.533594, 99.41172],
+                {"bubblingMouseEvents": true, "color": "#4896c8", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#4896c8", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_72ed3698a974712c19ac4027c45cfcd6.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอลานสัก<br>
+    <b>Tambon:</b> ตำบลลานสัก<br>
+    <b>Loyalty Ratio:</b> 26.6%<br>
+    <b>Votes:</b> 793.0 / 2980.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_f7360821d63466e773e567885911c488 = L.circle(
+                [15.442343, 99.645271],
+                {"bubblingMouseEvents": true, "color": "#0f5aa3", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0f5aa3", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_f7360821d63466e773e567885911c488.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอลานสัก<br>
+    <b>Tambon:</b> ตำบลประดู่ยืน<br>
+    <b>Loyalty Ratio:</b> 46.7%<br>
+    <b>Votes:</b> 1159.0 / 2482.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_9bddd0e4d38eef78bcc7b7c4cc5188cf = L.circle(
+                [15.537375, 99.322921],
+                {"bubblingMouseEvents": true, "color": "#08306b", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#08306b", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_9bddd0e4d38eef78bcc7b7c4cc5188cf.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอลานสัก<br>
+    <b>Tambon:</b> ตำบลระบำ<br>
+    <b>Loyalty Ratio:</b> 60.6%<br>
+    <b>Votes:</b> 3347.0 / 5524.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_582999d232564060a71bfed8409649e9 = L.circle(
+                [15.550078, 99.567348],
+                {"bubblingMouseEvents": true, "color": "#4e9acb", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#4e9acb", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_582999d232564060a71bfed8409649e9.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอลานสัก<br>
+    <b>Tambon:</b> ตำบลน้ำรอบ<br>
+    <b>Loyalty Ratio:</b> 25.1%<br>
+    <b>Votes:</b> 903.0 / 3600.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_38d2bb345ecb21592f9bfc991a671a4e = L.circle(
+                [15.230143, 99.664764],
+                {"bubblingMouseEvents": true, "color": "#2b7bba", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#2b7bba", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_38d2bb345ecb21592f9bfc991a671a4e.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลบ้านใหม่คลองเคียน<br>
+    <b>Loyalty Ratio:</b> 35.7%<br>
+    <b>Votes:</b> 484.0 / 1355.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_5667671c16853241577998d49b493eb3 = L.circle(
+                [15.159935, 99.290317],
+                {"bubblingMouseEvents": true, "color": "#4896c8", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#4896c8", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_5667671c16853241577998d49b493eb3.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลแก่นมะกรูด<br>
+    <b>Loyalty Ratio:</b> 26.5%<br>
+    <b>Votes:</b> 322.0 / 1217.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_849d09e09ce3954608d7b7f6098087bd = L.circle(
+                [15.23317, 99.389511],
+                {"bubblingMouseEvents": true, "color": "#0b559f", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0b559f", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_849d09e09ce3954608d7b7f6098087bd.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลคอกควาย<br>
+    <b>Loyalty Ratio:</b> 48.1%<br>
+    <b>Votes:</b> 1697.0 / 3529.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_3b79eb9f4fc88a7595f5898ea0ef5d3d = L.circle(
+                [15.185668, 99.689832],
+                {"bubblingMouseEvents": true, "color": "#2272b6", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#2272b6", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_3b79eb9f4fc88a7595f5898ea0ef5d3d.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลเมืองการุ้ง<br>
+    <b>Loyalty Ratio:</b> 38.4%<br>
+    <b>Votes:</b> 1020.0 / 2656.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_165867d054877b042bcf069edcc30b4a = L.circle(
+                [15.050689, 99.600735],
+                {"bubblingMouseEvents": true, "color": "#105ba4", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#105ba4", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_165867d054877b042bcf069edcc30b4a.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลทัพหลวง<br>
+    <b>Loyalty Ratio:</b> 46.2%<br>
+    <b>Votes:</b> 1845.0 / 3994.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_eb05b55bb9c98764770fa2911599b12c = L.circle(
+                [15.090257, 99.756716],
+                {"bubblingMouseEvents": true, "color": "#1f6eb3", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#1f6eb3", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_eb05b55bb9c98764770fa2911599b12c.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลหนองบ่มกล้วย<br>
+    <b>Loyalty Ratio:</b> 39.6%<br>
+    <b>Votes:</b> 602.0 / 1519.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_1483742d6cc9ef1d8bcb13b9eb2d06e0 = L.circle(
+                [15.029448, 99.556222],
+                {"bubblingMouseEvents": true, "color": "#1d6cb1", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#1d6cb1", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_1483742d6cc9ef1d8bcb13b9eb2d06e0.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลบ้านบึง<br>
+    <b>Loyalty Ratio:</b> 40.4%<br>
+    <b>Votes:</b> 577.0 / 1428.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_be0a432c4f0603fe364746e3c0f5f303 = L.circle(
+                [15.140354, 99.667549],
+                {"bubblingMouseEvents": true, "color": "#1966ad", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#1966ad", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_be0a432c4f0603fe364746e3c0f5f303.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลหูช้าง<br>
+    <b>Loyalty Ratio:</b> 42.6%<br>
+    <b>Votes:</b> 1126.0 / 2642.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_512ca347507251892f3777c8070626e0 = L.circle(
+                [15.107087, 99.634135],
+                {"bubblingMouseEvents": true, "color": "#0e59a2", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0e59a2", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_512ca347507251892f3777c8070626e0.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลบ้านไร่<br>
+    <b>Loyalty Ratio:</b> 46.8%<br>
+    <b>Votes:</b> 1512.0 / 3232.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_8b019682ad551377b960af52865ddb1c = L.circle(
+                [15.282827, 99.717694],
+                {"bubblingMouseEvents": true, "color": "#2070b4", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#2070b4", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_8b019682ad551377b960af52865ddb1c.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลวังหิน<br>
+    <b>Loyalty Ratio:</b> 39.1%<br>
+    <b>Votes:</b> 516.0 / 1321.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_d034bca74fdbd269b5fc2f33e231bc26 = L.circle(
+                [15.16825, 99.556222],
+                {"bubblingMouseEvents": true, "color": "#2070b4", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#2070b4", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_d034bca74fdbd269b5fc2f33e231bc26.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลห้วยแห้ง<br>
+    <b>Loyalty Ratio:</b> 39.1%<br>
+    <b>Votes:</b> 911.0 / 2331.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_1faac8ad5ceed07e96012212c091a520 = L.circle(
+                [15.149801, 99.445044],
+                {"bubblingMouseEvents": true, "color": "#2474b7", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#2474b7", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_1faac8ad5ceed07e96012212c091a520.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลเจ้าวัด<br>
+    <b>Loyalty Ratio:</b> 37.8%<br>
+    <b>Votes:</b> 700.0 / 1851.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_ce401d03371ab190549165c4404eceed = L.circle(
+                [15.046893, 99.689832],
+                {"bubblingMouseEvents": true, "color": "#125da6", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#125da6", "fillOpacity": 0.7, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 3000, "stroke": true, "weight": 1}
+            ).addTo(map_1be5c4bd74d9276138bfdc3f236a375f);
+        
+    
+            circle_ce401d03371ab190549165c4404eceed.bindTooltip(
+                `<div>
+                     
+    <b>Amphoe:</b> อำเภอบ้านไร่<br>
+    <b>Tambon:</b> ตำบลหนองจอก<br>
+    <b>Loyalty Ratio:</b> 45.7%<br>
+    <b>Votes:</b> 1186.0 / 2598.0
+    
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+</script>
+</html>

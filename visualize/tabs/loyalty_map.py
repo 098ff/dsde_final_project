@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
+
+_DATA_DIR = Path(__file__).parent.parent / "data"
+_FOLIUM_HTML = _DATA_DIR / "loyalty_map_tambon.html"
 
 
 def render_loyalty_tab(ratio_df: pd.DataFrame) -> None:
@@ -61,12 +66,21 @@ def render_loyalty_tab(ratio_df: pd.DataFrame) -> None:
 
     st.divider()
 
-    # ── Map or bar chart ─────────────────────────────────────────────────────
+    # ── Map: Folium HTML (primary) or pydeck scatter (fallback) ───────────────
 
-    map_rendered = _try_render_pydeck_map(ratio_df)
-
-    if not map_rendered:
-        _render_bar_chart_fallback(ratio_df)
+    if _FOLIUM_HTML.exists():
+        st.subheader("Interactive Loyalty Map (Folium)")
+        st.caption(
+            "Circle size = fixed 3 km radius per tambon. "
+            "Colour scale: light blue = low Bhumjaithai support, dark blue = high. "
+            "Hover over each circle for amphoe, tambon, ratio, and vote counts."
+        )
+        html_content = _FOLIUM_HTML.read_text(encoding="utf-8")
+        components.html(html_content, height=550, scrolling=False)
+    else:
+        map_rendered = _try_render_pydeck_map(ratio_df)
+        if not map_rendered:
+            _render_bar_chart_fallback(ratio_df)
 
     st.divider()
 
