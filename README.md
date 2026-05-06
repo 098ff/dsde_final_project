@@ -188,4 +188,5 @@ cd election_pipeline && uv run pytest validation/tests/
 - **Chanatda Konchom** (6631305321)
 - **Chatrin Yoonchalard** (6631304721) - Validation Pipeline, Visualization 
 - **Rinlada Rojchanapakul** - OCR Quality Assurance
+- **Nantaporn Phuaphanbun** (6631330021) - Paddle-OCR, web-scraping, prepared insights
 - Course: 2110446 Data Science and Data Engineering, Chulalongkorn University
