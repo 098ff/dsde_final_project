@@ -140,7 +140,7 @@ def _find_thai_font():
     try:
         from matplotlib import font_manager as fm  # noqa: PLC0415
         available = {f.name for f in fm.fontManager.ttflist}
-        for name in ["Noto Sans Thai", "Garuda", "Loma", "Kinnari", "TH Sarabun New",
+        for name in ["Tahoma", "Sukhumvit Set", "Thonburi", "Ayuthaya", "Arial Unicode MS", "Noto Sans Thai", "Garuda", "Loma", "Kinnari", "TH Sarabun New",
                      "Noto Sans", "Sarabun"]:
             if name in available:
                 return fm.FontProperties(family=name), name
@@ -163,12 +163,17 @@ def _render_bell_curve(merged_df: pd.DataFrame) -> None:
         import matplotlib.pyplot as plt  # noqa: PLC0415
         import seaborn as sns  # noqa: PLC0415
         from scipy.stats import norm  # noqa: PLC0415
+        import matplotlib as mpl
+        
+        # Force Thai font for Mac/Windows
+        mpl.rcParams['font.family'] = ['Sukhumvit Set', 'Thonburi', 'Tahoma', 'sans-serif']
 
-        thai_prop, thai_name = _find_thai_font()
-
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(9, 4.5))
         fig.patch.set_facecolor("#0e1117")
         ax.set_facecolor("#0e1117")
+        
+        # Zoom out X-axis to give more space for text
+        ax.set_xlim(-5, 7)
 
         # Histogram
         sns.histplot(
@@ -209,10 +214,10 @@ def _render_bell_curve(merged_df: pd.DataFrame) -> None:
             for _, row in outliers.iterrows():
                 z = float(row["z_score"])
                 raw_name = str(row["party_name"]).split("-")[-1].strip()
-                # Fall back to ASCII label when no Thai font is available
-                label = raw_name if thai_prop is not None else f"z={z:.2f}"
+                label = raw_name
+                # Stagger labels vertically if they are within distance of 2.0 to avoid overlap
                 offset = min(
-                    0.18 + 0.06 * sum(1 for sx in seen_x if abs(sx - z) < 0.8),
+                    0.18 + 0.10 * sum(1 for sx in seen_x if abs(sx - z) < 2.0),
                     y_top * 0.85,
                 )
                 annot_kwargs: dict = dict(
@@ -224,8 +229,6 @@ def _render_bell_curve(merged_df: pd.DataFrame) -> None:
                     ha="center",
                     annotation_clip=False,
                 )
-                if thai_prop is not None:
-                    annot_kwargs["fontproperties"] = thai_prop
                 ax.annotate(label, **annot_kwargs)
                 seen_x.append(z)
 
@@ -244,7 +247,8 @@ def _render_bell_curve(merged_df: pd.DataFrame) -> None:
         ax.grid(True, linestyle="--", alpha=0.3, color="#444")
         fig.tight_layout()
 
-        st.pyplot(fig)
+        # Display with use_container_width=False to prevent it from stretching
+        st.pyplot(fig, use_container_width=False)
         plt.close(fig)
 
     except ImportError as exc:
