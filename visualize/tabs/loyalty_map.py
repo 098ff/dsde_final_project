@@ -32,7 +32,7 @@ def render_loyalty_tab(ratio_df: pd.DataFrame) -> None:
         The map (or chart below) shows the geographic distribution of this ratio
         across Tambons in the dataset.
 
-        **Data:** Uthai Thani province (อุทัยธานี) — อำเภอบ้านไร่ sub-districts.
+        **Data:** Uthai Thani province (อุทัยธานีเขต 2).
         """
     )
 
