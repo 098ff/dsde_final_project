@@ -649,45 +649,45 @@ with tab_verify:
                     if unrev_in_tam:
                         tam_label += f" · {unrev_in_tam} unreviewed"
 
-                    with st.expander(tam_label, expanded=(unrev_in_tam > 0)):
-                        for unit, unit_df in tam_df.groupby("unit", sort=True):
-                            if unit:
-                                st.markdown(f"&nbsp;&nbsp;&nbsp;หน่วยเลือกตั้ง **{unit}**")
+                    st.markdown(f"**{tam_label}**")
+                    for unit, unit_df in tam_df.groupby("unit", sort=True):
+                        if unit:
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;หน่วยเลือกตั้ง **{unit}**")
 
-                            # Render each issue as a row with a resolution selectbox
-                            for _idx, (_, issue_row) in enumerate(unit_df.iterrows()):
-                                rkey = _resolution_key(issue_row)
-                                wkey = f"res_{rkey}__{_idx}"
-                                current_res = st.session_state.ver_resolutions.get(rkey, "")
-                                issue_label = _ISSUE_LABELS.get(
-                                    issue_row["issue_type"], issue_row["issue_type"]
+                        # Render each issue as a row with a resolution selectbox
+                        for _idx, (_, issue_row) in enumerate(unit_df.iterrows()):
+                            rkey = _resolution_key(issue_row)
+                            wkey = f"res_{rkey}__{_idx}"
+                            current_res = st.session_state.ver_resolutions.get(rkey, "")
+                            issue_label = _ISSUE_LABELS.get(
+                                issue_row["issue_type"], issue_row["issue_type"]
+                            )
+
+                            r_col1, r_col2 = st.columns([0.65, 0.35])
+                            with r_col1:
+                                res_badge = _RESOLUTION_LABELS.get(
+                                    current_res, current_res
                                 )
-
-                                r_col1, r_col2 = st.columns([0.65, 0.35])
-                                with r_col1:
-                                    res_badge = _RESOLUTION_LABELS.get(
-                                        current_res, current_res
-                                    )
-                                    st.markdown(
-                                        f"**{issue_label}** &nbsp;`{issue_row['file_type']}`  \n"
-                                        f"<small>{issue_row['issue_details']}</small>",
-                                        unsafe_allow_html=True,
-                                    )
-                                with r_col2:
-                                    st.selectbox(
-                                        "Resolution",
-                                        options=_RESOLUTION_OPTIONS,
-                                        index=(
-                                            _RESOLUTION_OPTIONS.index(current_res)
-                                            if current_res in _RESOLUTION_OPTIONS
-                                            else 0
-                                        ),
-                                        format_func=lambda x: _RESOLUTION_LABELS.get(x, x),
-                                        key=wkey,
-                                        on_change=set_resolution_callback,
-                                        args=(rkey, wkey),
-                                        label_visibility="collapsed",
-                                    )
+                                st.markdown(
+                                    f"**{issue_label}** &nbsp;`{issue_row['file_type']}`  \n"
+                                    f"<small>{issue_row['issue_details']}</small>",
+                                    unsafe_allow_html=True,
+                                )
+                            with r_col2:
+                                st.selectbox(
+                                    "Resolution",
+                                    options=_RESOLUTION_OPTIONS,
+                                    index=(
+                                        _RESOLUTION_OPTIONS.index(current_res)
+                                        if current_res in _RESOLUTION_OPTIONS
+                                        else 0
+                                    ),
+                                    format_func=lambda x: _RESOLUTION_LABELS.get(x, x),
+                                    key=wkey,
+                                    on_change=set_resolution_callback,
+                                    args=(rkey, wkey),
+                                    label_visibility="collapsed",
+                                )
 
                             st.markdown("")
 
