@@ -147,6 +147,7 @@ build/
 /อำเภอบ้านไร่
 */output*
 mock/
+!scraping/metadata.csv
 
 # ==========================================
 # 8. Planning
